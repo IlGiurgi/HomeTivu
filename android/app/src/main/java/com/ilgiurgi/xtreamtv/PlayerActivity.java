@@ -52,6 +52,7 @@ public class PlayerActivity extends AppCompatActivity {
     static final String EXTRA_START_MS = "startMs";
     static final String EXTRA_LIVE = "live";
     static final String EXTRA_SWIPE = "swipe";
+    static final String EXTRA_USER_AGENT = "userAgent";
     static final String RESULT_POSITION_MS = "positionMs";
     static final String RESULT_DURATION_MS = "durationMs";
     static final String RESULT_ERROR = "error";
@@ -91,6 +92,9 @@ public class PlayerActivity extends AppCompatActivity {
                 .setAllowCrossProtocolRedirects(true)
                 .setConnectTimeoutMs(15000)
                 .setReadTimeoutMs(15000);
+        String ua = intent.getStringExtra(EXTRA_USER_AGENT);
+        if ("vlc".equals(ua)) http.setUserAgent("VLC/3.0.20 LibVLC/3.0.20");
+        else if ("smarters".equals(ua)) http.setUserAgent("IPTVSmartersPro");
         player = new ExoPlayer.Builder(this)
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(this).setDataSourceFactory(http))
                 .build();
@@ -113,6 +117,11 @@ public class PlayerActivity extends AppCompatActivity {
             @Override
             public void onPlayerError(PlaybackException error) {
                 lastError = error.getErrorCodeName();
+                // Se il provider ha risposto (403, 404, 884...), il codice HTTP dice più del nome generico dell'errore.
+                Throwable cause = error.getCause();
+                if (cause instanceof androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+                    lastError += " HTTP " + ((androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) cause).responseCode;
+                }
                 if (live && liveRetries < MAX_LIVE_RETRIES) {
                     // Le dirette IPTV cadono spesso per qualche secondo: si riprova da soli.
                     retryLive();

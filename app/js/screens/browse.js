@@ -309,7 +309,7 @@
   // La guida si chiede canale per canale (get_short_epg), solo per le righe già mostrate,
   // poche richieste alla volta per non rallentare la TV, e resta in memoria per qualche minuto.
   var EPG_TTL = 5 * 60000;
-  var EPG_PARALLEL = 3;
+  var EPG_PARALLEL = 2;
   var EPG_LIMIT = 8; // programmi per canale: bastano per le 3 ore della guida a griglia
   var epgCache = {}; // id canale -> {at, list, loading}
   var epgQueue = [];
@@ -1060,6 +1060,16 @@
       formatButton.textContent = formatLabel();
     });
 
+    var UA_NAMES = { 'default': 'predefinito', vlc: 'VLC', smarters: 'IPTV Smarters' };
+    var UA_ORDER = ['default', 'vlc', 'smarters'];
+    var uaLabel = function () { return 'Il lettore si presenta come: ' + UA_NAMES[App.settings.userAgent]; };
+    var uaButton = settingButton('setting-user-agent', uaLabel(), function () {
+      var next = UA_ORDER[(UA_ORDER.indexOf(App.settings.userAgent) + 1) % UA_ORDER.length];
+      App.settings.userAgent = next;
+      App.saveSettings();
+      uaButton.textContent = uaLabel();
+    });
+
     var lastChannelLabel = function () {
       return 'All\'avvio riapri l\'ultimo canale: ' + (App.settings.resumeLastChannel ? 'Sì' : 'No');
     };
@@ -1231,6 +1241,8 @@
         h('h2', { text: 'Feed di riserva' }),
         feedButton,
         feedListing,
+        uaButton,
+        h('p.hint', { text: 'Con errore 403 prova VLC o IPTV Smarters: alcuni provider bloccano i lettori che non conoscono.' }),
         historyButton,
         historyListing,
         Platform.isTV ? h('div.home-settings', {}, homePanel) : h('div.home-settings', {}, remotePanel),

@@ -43,7 +43,13 @@
   var JANK_GAP_MS = 2500; // buco tra due controlli: il browser era occupato (liste enormi, immagini), non lo stream
   var SLEEP_GAP_MS = 20000; // buco molto più lungo: la TV era in standby
   var SHORT_HIDE_MS = 20000; // app nascosta meno di così (barra volume, notifiche): lo stream si riprende com'è
-  var RETRY_DELAYS = [300, 1000, 2000, 4000, 8000, 15000];
+  // Prima pausa di 2 s: riaprire subito lo stesso canale lascia la connessione di prima ancora aperta per il provider,
+  // che con un limite di 1-2 connessioni risponde 403.
+  var RETRY_DELAYS = [2000, 2500, 4000, 8000, 15000, 15000];
+  var LIMIT_PAUSE_MS = 6000; // dopo un 403/429 si lascia al provider il tempo di chiudere la connessione precedente
+  var USER_AGENTS = { vlc: 'VLC/3.0.20 LibVLC/3.0.20', smarters: 'IPTVSmartersPro' };
+  var userAgent = ''; // '' = quello del sistema
+  var lastStatus = 0; // ultimo codice HTTP letto sullo stream dopo un errore (0 = sconosciuto)
 
   var sources = []; // [{url, label}]: il contenuto scelto e i suoi feed alternativi
   var sourceIndex = 0;
@@ -65,6 +71,13 @@
   var Player = {
     onEvent: function () {},
     history: function () { return history.slice(); },
+
+    /** 'default' (UA del sistema), 'vlc' o 'smarters': l'identità con cui il lettore si presenta al provider. */
+    setUserAgent: function (name) { userAgent = USER_AGENTS[name] || ''; },
+    userAgent: function () { return userAgent || 'predefinito del sistema'; },
+
+    /** Chiede lo stream e legge solo il codice HTTP (poi chiude): serve a capire se un errore è un 403 del provider. */
+    probe: function (url) { return probeStatus(url); },
     url: null,
     paused: false,
 
@@ -257,6 +270,29 @@
     }
   }
 
+  function probeStatus(url) {
+    return new Promise(function (resolve) {
+      var xhr;
+      var done = false;
+      function finish(status) {
+        if (done) return;
+        done = true;
+        try { xhr.abort(); } catch (e) { /* già chiusa */ }
+        resolve(status);
+      }
+      try {
+        xhr = new root.XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onreadystatechange = function () { if (xhr.readyState >= 2) finish(xhr.status); };
+        xhr.onerror = function () { finish(0); };
+        xhr.send();
+        setTimeout(function () { finish(0); }, 8000);
+      } catch (e) {
+        resolve(0);
+      }
+    });
+  }
+
   /** Apre il feed corrente (sources[sourceIndex]) da capo. */
   function openSource(startAt) {
     clearTimeout(retryTimer);
@@ -279,6 +315,7 @@
   }
 
   function onPrepared() {
+    lastStatus = 0;
     watch.prepared = true;
     watch.bufferingSince = 0;
     watch.lastProgress = Date.now();
@@ -304,16 +341,31 @@
     }
     note('stream riavviato (tentativo ' + (attempt + 1) + '): ' + message);
     var resumeAt = resumePoint();
+    var failedAt = Date.now();
     var delay = RETRY_DELAYS[attempt];
     attempt++;
-    // Il primo tentativo riprova lo stesso feed (spesso basta), i successivi cambiano feed.
-    var switched = attempt > 1 && sources.length > 1;
+    // Se il server ha già risposto 403/429 (limite di connessioni), cambiare feed aprirebbe altre connessioni: si resta.
+    var switched = attempt > 1 && sources.length > 1 && lastStatus !== 403 && lastStatus !== 429;
     if (switched) sourceIndex = (sourceIndex + 1) % sources.length;
-    closeEngine();
+    var failedUrl = sources[sourceIndex].url;
+    closeEngine(); // prima si chiude la connessione, poi si interroga il server: mai due connessioni insieme
+    var mine = session;
+    // Il codice HTTP del provider si legge a parte e finisce nella cronologia; con 403/429 si aspetta di più.
+    var probed = probeStatus(failedUrl).then(function (status) {
+      lastStatus = status;
+      if (status) note('risposta del server: HTTP ' + status + (status === 403 ? ' (accesso negato o limite di connessioni)' : ''));
+    });
     emit('retrying', { attempt: attempt, max: RETRY_DELAYS.length, label: sources[sourceIndex].label, switched: switched });
     retryTimer = setTimeout(function () {
-      retryTimer = null;
-      if (sources.length) openSource(resumeAt);
+      probed.then(function () {
+        if (!sources.length || session !== mine) return; // nel frattempo è stato scelto altro
+        var limited = lastStatus === 403 || lastStatus === 429;
+        var wait = limited ? Math.max(0, LIMIT_PAUSE_MS - (Date.now() - failedAt)) : 0;
+        retryTimer = setTimeout(function () {
+          retryTimer = null;
+          if (sources.length && session === mine) openSource(resumeAt);
+        }, wait);
+      });
     }, delay);
   }
 
@@ -424,6 +476,9 @@
     function current() { return id === session; } // false se nel frattempo si è riaperto o scelto altro
     try {
       avplay.open(url);
+      if (userAgent) {
+        try { avplay.setStreamingProperty('USER_AGENT', userAgent); } catch (e) { /* firmware senza questa proprietà */ }
+      }
       applyAvplayWindow();
       try { avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX'); } catch (e) { /* firmware vecchi */ }
       avplay.setListener({

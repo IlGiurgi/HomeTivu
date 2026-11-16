@@ -224,8 +224,10 @@
 
     saveSettings: function () {
       Storage.setSettings(this.settings);
+      Player.setUserAgent(this.settings.userAgent);
     }
   };
+  Player.setUserAgent(App.settings.userAgent);
 
   function onKeyDown(event) {
     var key = Keys.parse(event);

@@ -14,7 +14,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * Plugin "NativePlayer": apre {@link PlayerActivity} (ExoPlayer) con una playlist e restituisce
  * a JavaScript l'elemento e la posizione a cui l'utente si è fermato, per la ripresa.
  *
- * JS: NativePlayer.play({ items: [{url, title}], index, startAt (secondi), live, swipe })
+ * JS: NativePlayer.play({ items: [{url, title}], index, startAt (secondi), live, swipe, userAgent })
  *     -> { index, position (s), duration (s), error }
  */
 @CapacitorPlugin(name = "NativePlayer")
@@ -33,6 +33,7 @@ public class NativePlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_START_MS, (long) (call.getDouble("startAt", 0.0) * 1000));
         intent.putExtra(PlayerActivity.EXTRA_LIVE, call.getBoolean("live", false));
         intent.putExtra(PlayerActivity.EXTRA_SWIPE, call.getBoolean("swipe", false));
+        intent.putExtra(PlayerActivity.EXTRA_USER_AGENT, call.getString("userAgent", "default"));
         startActivityForResult(call, intent, "onPlayerClosed");
     }
 

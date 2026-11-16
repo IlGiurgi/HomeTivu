@@ -410,7 +410,8 @@
       index: startIndex,
       startAt: params.startAt || 0,
       live: item().type === 'live',
-      swipe: !!App.settings.playerSwipe
+      swipe: !!App.settings.playerSwipe,
+      userAgent: App.settings.userAgent
     }).then(function (result) {
       // Episodi visti per intero mentre la playlist avanzava da sola: niente più ripresa.
       for (var i = startIndex; i < result.index && i < slice.length; i++) {

@@ -51,6 +51,8 @@
       var settings = read('settings', {});
       return {
         liveFormat: settings.liveFormat || 'ts',
+        // Identità del lettore verso il provider: 'default' (sistema), 'vlc' o 'smarters'.
+        userAgent: settings.userAgent || 'default',
         // Sezione all'apertura: 'launcher' = Home a riquadri (solo TV), 'last' = ultima usata.
         startSection: settings.startSection || 'launcher',
         resumeLastChannel: settings.resumeLastChannel !== false,
