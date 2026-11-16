@@ -117,15 +117,28 @@
     return run();
   }
 
+  /** Spiegazione breve dei codici HTTP con cui i provider rifiutano un client. */
+  function httpHint(status) {
+    if (status === 403) return ' (accesso negato dal provider: troppe connessioni, client non riconosciuto o IP bloccato)';
+    if (status === 429) return ' (troppe richieste ravvicinate: attendi qualche secondo)';
+    return '';
+  }
+
+  var apiUserAgent = ''; // User-Agent per le richieste API; solo dove il sistema permette di impostarlo (app Android)
+
   /** Una richiesta GET JSON via XMLHttpRequest (supporta timeout, a differenza di fetch). */
   function xhrJsonOnce(url, timeout) {
     return new Promise(function (resolve, reject) {
       var xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
       xhr.timeout = timeout || DEFAULT_TIMEOUT;
+      if (apiUserAgent) {
+        try { xhr.setRequestHeader('User-Agent', apiUserAgent); } catch (e) { /* intestazione vietata nel browser */ }
+      }
       xhr.onload = function () {
         if (xhr.status < 200 || xhr.status >= 300) {
-          var httpErr = new Error('Errore HTTP ' + xhr.status);
+          var httpErr = new Error('Errore HTTP ' + xhr.status + httpHint(xhr.status));
+          httpErr.status = xhr.status;
           httpErr.retryable = xhr.status === 404 || xhr.status >= 500;
           reject(httpErr);
           return;
@@ -138,10 +151,15 @@
       };
       xhr.onerror = function () {
         var err = new Error('Impossibile contattare il server (' + url.split('/player_api.php')[0] + ')');
+        err.status = 0;
         err.network = true; // nessuna risposta: rete, certificato, CORS o contenuto misto
         reject(err);
       };
-      xhr.ontimeout = function () { reject(new Error('Timeout della richiesta')); };
+      xhr.ontimeout = function () {
+        var timeoutErr = new Error('Timeout della richiesta (il server non risponde)');
+        timeoutErr.status = 0;
+        reject(timeoutErr);
+      };
       xhr.send();
     });
   }
@@ -167,8 +185,20 @@
     return url;
   };
 
+  // Come i player commerciali (IPTV Smarters), le chiamate pesanti partono una alla volta con una breve pausa:
+  // molti provider rifiutano (403/429) più richieste simultanee dallo stesso account.
+  var SEQUENTIAL_GAP = 300;
+  var EPG_ACTIONS = { get_short_epg: true, get_simple_data_table: true };
+
   XtreamClient.prototype.call = function (action, params) {
-    return this.request(this.apiUrl(action, params));
+    var url = this.apiUrl(action, params);
+    if (EPG_ACTIONS[action]) return this.request(url);
+    var self = this;
+    var run = function () { return self.request(url); };
+    var result = (this.queue || Promise.resolve()).then(run);
+    this.queue = result.then(null, function () { /* l'errore va al chiamante, la coda prosegue */ })
+      .then(function () { return new Promise(function (resolve) { setTimeout(resolve, SEQUENTIAL_GAP); }); });
+    return result;
   };
 
   /** Login: restituisce {user_info, server_info} o rifiuta con un messaggio leggibile. */
@@ -267,6 +297,7 @@
     alternateServer: alternateServer,
     hostOf: hostOf,
     parseAccountUrl: parseAccountUrl,
+    setApiUserAgent: function (value) { apiUserAgent = value || ''; },
     decodeBase64: decodeBase64,
     normalizeEpisodes: normalizeEpisodes,
     sortedSeasonNumbers: sortedSeasonNumbers

@@ -225,9 +225,17 @@
     saveSettings: function () {
       Storage.setSettings(this.settings);
       Player.setUserAgent(this.settings.userAgent);
+      applyApiUserAgent();
     }
   };
   Player.setUserAgent(App.settings.userAgent);
+
+  /** Solo nell'app Android le richieste API sono native e accettano lo User-Agent scelto nelle Impostazioni. */
+  function applyApiUserAgent() {
+    var names = { vlc: 'VLC/3.0.20 LibVLC/3.0.20', smarters: 'IPTVSmartersPro' };
+    Xtream.setApiUserAgent(Platform.isAndroidApp ? names[App.settings.userAgent] : '');
+  }
+  applyApiUserAgent();
 
   function onKeyDown(event) {
     var key = Keys.parse(event);

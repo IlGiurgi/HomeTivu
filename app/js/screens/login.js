@@ -83,7 +83,9 @@
     }
     var page = root.location.protocol;
     if (page === 'https:' && /^http:/i.test(Xtream.normalizeServer(server))) {
-      return '\nQuesta pagina è https: il browser blocca i server http. Usa l\'indirizzo https del server o l\'app sulla TV.';
+      return '\nQuesta pagina è https: il browser blocca i server http. Se il provider offre un indirizzo https usalo. ' +
+        'Altrimenti in Brave/Chrome clicca l\'icona a sinistra dell\'indirizzo → Impostazioni sito → "Contenuto non sicuro" → Consenti, ' +
+        'poi ricarica la pagina (il browser può azzerare la scelta dopo un riavvio). In alternativa usa l\'app sulla TV o sul telefono.';
     }
     return '\nDal browser il server non risponde: può bloccare le richieste dai siti web (CORS) o funzionare ' +
       'solo in http, che una pagina https non può usare. Usa l\'app sulla TV o sul telefono Android.';
