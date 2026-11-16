@@ -277,6 +277,28 @@ async function main() {
     await page.evaluate(function () { localStorage.removeItem('xtreamtv.home'); });
   });
 
+  await step('Fuori casa: Home Assistant non risponde, il canale si apre lo stesso in pochi secondi (poi subito)', async function () {
+    await page.unroute('http://ha.test:8123/**');
+    await page.route('http://ha.test:8123/**', function () { /* nessuna risposta: come fuori casa */ });
+    await page.evaluate(function () {
+      localStorage.removeItem('xtreamtv.lastChannel');
+      localStorage.setItem('xtreamtv.home', JSON.stringify({ url: 'http://ha.test:8123', token: 't' }));
+    });
+    await page.reload();
+    await page.waitForSelector('#screen-browse.active .items .row');
+    var started = Date.now();
+    await page.click('.items .row >> nth=0');
+    await page.waitForSelector('#screen-player.active', { timeout: 8000 });
+    assert.ok(Date.now() - started < 6000, 'il primo canale non deve aspettare i 15 secondi di Home Assistant');
+    await page.evaluate(function () { App.back(); });
+    await page.waitForSelector('#screen-browse.active .items .row');
+    started = Date.now();
+    await page.click('.items .row >> nth=1');
+    await page.waitForSelector('#screen-player.active', { timeout: 3000 });
+    assert.ok(Date.now() - started < 1500, 'dopo un fallimento Home Assistant non si ricontrolla per un minuto');
+    await page.evaluate(function () { localStorage.removeItem('xtreamtv.home'); });
+  });
+
   assert.deepStrictEqual(errors, [], 'errori JavaScript nella pagina');
   await browser.close();
   server.close();

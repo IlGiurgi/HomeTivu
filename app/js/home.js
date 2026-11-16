@@ -178,13 +178,13 @@
       return !!(c.url && c.token);
     },
 
-    /** Richiesta JSON con il token nell'intestazione; `body` presente = POST. */
-    request: function (path, body) {
+    /** Richiesta JSON con il token nell'intestazione; `body` presente = POST; `timeout` (ms) sostituisce quello di default. */
+    request: function (path, body, timeout) {
       var c = this.config();
       return new Promise(function (resolve, reject) {
         var xhr = new XMLHttpRequest();
         xhr.open(body === undefined ? 'GET' : 'POST', c.url + path, true);
-        xhr.timeout = TIMEOUT;
+        xhr.timeout = timeout || TIMEOUT;
         xhr.setRequestHeader('Authorization', 'Bearer ' + c.token);
         if (body !== undefined) xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.onload = function () {

@@ -74,6 +74,25 @@
     return out;
   }
 
+  // Fuori casa Home Assistant non risponde: una richiesta di controllo non deve far aspettare l'apertura di un canale.
+  // Timeout corto, e dopo un fallimento per un minuto non si riprova (si risponde subito "non so").
+  var QUICK_MS = 2500;
+  var BACKOFF_MS = 60000;
+  var downUntil = 0;
+
+  /** GET rapida a HA; null se HA è irraggiungibile (o lo era da poco), senza far aspettare. */
+  function quickGet(path) {
+    if (Date.now() < downUntil) return Promise.resolve(null);
+    return root.Home.request(path, undefined, QUICK_MS).then(function (data) {
+      downUntil = 0;
+      return data;
+    }, function (err) {
+      // Solo la rete (timeout, nessun collegamento) mette in pausa i controlli: un 401 o 404 vuol dire che HA risponde.
+      if (/non risponde|Impossibile contattare/.test(err && err.message || '')) downUntil = Date.now() + BACKOFF_MS;
+      return null;
+    });
+  }
+
   var Remote = {
     EVENT: EVENT,
     pickPlaying: pickPlaying,
@@ -86,7 +105,7 @@
     send: function (target, action, item) {
       var command = build(target, action, item);
       if (!command) return Promise.reject(new Error('Comando non valido'));
-      var post = function () { return root.Home.request('/api/events/' + EVENT, command); };
+      var post = function () { return root.Home.request('/api/events/' + EVENT, command, 5000); };
       // Un singolo errore di rete (Wi-Fi che si risveglia, HA occupato) non deve far perdere il comando.
       return post().then(null, function (err) {
         if (/401/.test(err.message) || /Token/.test(err.message)) throw err;
@@ -123,24 +142,24 @@
     /** TV disponibili adesso; con errori o HA non configurato risolve []. */
     availableTvs: function () {
       if (!root.Home || !root.Home.configured()) return Promise.resolve([]);
-      return root.Home.request('/api/states').then(function (states) {
+      return quickGet('/api/states').then(function (states) {
         return pickAvailable(states, Date.now());
-      }, function () { return []; });
+      });
     },
 
     /** Cosa sta guardando la TV scelta: {state, programma, ...} oppure null se non annunciata. */
     status: function () {
       var target = this.target();
       if (!target) return Promise.resolve(null);
-      return root.Home.request('/api/states/sensor.hometivu_' + target).then(function (s) { return s; }, function () { return null; });
+      return quickGet('/api/states/sensor.hometivu_' + target);
     },
 
     /** Una TV sta riproducendo adesso? {name, state} oppure null; con errori o HA non configurato risolve null. */
     tvPlaying: function () {
       if (!root.Home || !root.Home.configured()) return Promise.resolve(null);
-      return root.Home.request('/api/states').then(function (states) {
+      return quickGet('/api/states').then(function (states) {
         return pickPlaying(states, Date.now());
-      }, function () { return null; });
+      });
     },
 
     /** Manda alla TV scelta; avvisa se non si è scelta nessuna TV. */
