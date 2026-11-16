@@ -185,9 +185,8 @@
     return url;
   };
 
-  // Come i player commerciali (IPTV Smarters), le chiamate pesanti partono una alla volta con una breve pausa:
+  // Come i player commerciali (IPTV Smarters), le chiamate pesanti partono una alla volta:
   // molti provider rifiutano (403/429) più richieste simultanee dallo stesso account.
-  var SEQUENTIAL_GAP = 300;
   var EPG_ACTIONS = { get_short_epg: true, get_simple_data_table: true };
 
   XtreamClient.prototype.call = function (action, params) {
@@ -196,8 +195,7 @@
     var self = this;
     var run = function () { return self.request(url); };
     var result = (this.queue || Promise.resolve()).then(run);
-    this.queue = result.then(null, function () { /* l'errore va al chiamante, la coda prosegue */ })
-      .then(function () { return new Promise(function (resolve) { setTimeout(resolve, SEQUENTIAL_GAP); }); });
+    this.queue = result.then(null, function () { /* l'errore va al chiamante, la coda prosegue */ });
     return result;
   };
 
