@@ -482,7 +482,7 @@
       var live = isLive();
       switch (action) {
         case 'back':
-          state.toMini = live && !Platform.isAndroidApp && !rootEl.classList.contains('mobile');
+          state.toMini = live && !Platform.isAndroidApp && !rootEl.classList.contains('mobile') && !App.settings.backStops;
           App.back();
           return true;
         case 'stop':

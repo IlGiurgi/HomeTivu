@@ -58,6 +58,9 @@
   var retryTimer = null;
   var suspended = false;
   var isLive = false;
+  var parked = false; // diretta in pausa da tempo: stream chiuso per non occupare una connessione del provider
+  var parkTimer = null;
+  var PARK_MS = 60000;
   var watch = {};
   var suspendedAt = 0;
   var history = []; // ultimi riavvii dello stream e il loro motivo (Impostazioni > diagnosi)
@@ -124,6 +127,8 @@
     },
 
     stop: function () {
+      clearTimeout(parkTimer);
+      parked = false;
       this.url = null;
       sources = [];
       sourceIndex = 0;
@@ -146,10 +151,22 @@
         else html5().pause();
         this.paused = true;
         emit('paused');
+        // Una diretta in pausa continua a tenere aperta la connessione col provider (che ne ammette 1-2): dopo
+        // un minuto si chiude, e al "play" si riparte dal vivo.
+        clearTimeout(parkTimer);
+        if (isLive) parkTimer = setTimeout(park, PARK_MS);
       } catch (e) { /* non in riproduzione */ }
     },
 
     resume: function () {
+      clearTimeout(parkTimer);
+      if (parked) {
+        parked = false;
+        note('riapro la diretta dopo la pausa');
+        attempt = 0;
+        openSource(0);
+        return;
+      }
       try {
         if (avplay) avplay.play();
         else html5().play();
@@ -219,6 +236,12 @@
         try { avplay.suspend(); } catch (e) { /* ignorato */ }
       } else if (!avplay) {
         html5().pause();
+        // Scheda nascosta: una diretta non va lasciata scaricare in sottofondo, occupa la connessione del provider.
+        if (isLive && this.url) {
+          session++;
+          closeEngine();
+          parked = true;
+        }
       }
     },
 
@@ -226,6 +249,12 @@
       var hiddenFor = Date.now() - suspendedAt;
       suspended = false;
       if (!this.url || !sources.length) return;
+      if (parked && !this.paused) {
+        parked = false;
+        attempt = 0;
+        openSource(0);
+        return;
+      }
       if (isLive && hiddenFor > SHORT_HIDE_MS) {
         // Dopo standby o una lunga sospensione lo stream ripreso è vecchio o bloccato: la diretta si riapre dal vivo.
         note('riapro la diretta dopo ' + Math.round(hiddenFor / 1000) + ' s in background');
@@ -253,11 +282,23 @@
     Player.onEvent(type, data);
   }
 
+  /** Diretta in pausa da troppo: si chiude lo stream (resume() la riapre dal vivo). */
+  function park() {
+    if (!Player.paused || !isLive || !Player.url || parked) return;
+    note('diretta in pausa da tempo: chiudo lo stream');
+    parked = true;
+    session++;
+    clearTimeout(retryTimer);
+    retryTimer = null;
+    closeEngine();
+  }
+
   function closeEngine() {
     if (avplay) {
+      // stop e close separati: se stop() rifiuta (player non in riproduzione) close() deve comunque liberare la connessione.
       try {
         if (avplay.getState() !== 'NONE') {
-          avplay.stop();
+          try { avplay.stop(); } catch (e) { /* non in riproduzione */ }
           avplay.close();
         }
       } catch (e) { /* già chiuso */ }

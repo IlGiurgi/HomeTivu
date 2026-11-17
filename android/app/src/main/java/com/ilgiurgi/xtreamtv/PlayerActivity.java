@@ -321,7 +321,13 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        if (player != null) player.pause();
+        if (player == null) return;
+        if (live) {
+            // Una diretta in sottofondo tiene aperta la connessione col provider (limite di 1-2): si chiude e si torna all'app.
+            finishWithResult();
+        } else {
+            player.pause();
+        }
     }
 
     @Override

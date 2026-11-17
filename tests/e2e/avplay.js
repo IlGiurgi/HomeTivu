@@ -190,6 +190,25 @@ async function main() {
     await page.evaluate(function () { Player.stop(); });
   });
 
+  await step('diretta in pausa: dopo un minuto lo stream si chiude, al play riparte dal vivo', async function () {
+    await page.evaluate(function () { Player.play('http://x.test/live/demo/demo/2.ts', 0, true); });
+    await page.waitForFunction(function () { return window.fakeAvplay.state === 'PLAYING'; });
+    var opens = await page.evaluate(function () {
+      return window.fakeAvplay.calls.filter(function (c) { return c[0] === 'open'; }).length;
+    });
+    await page.evaluate(function () {
+      var real = window.setTimeout;
+      window.setTimeout = function (fn, ms) { return real(fn, ms === 60000 ? 10 : ms); }; // il minuto di attesa passa subito
+      Player.pause();
+      window.setTimeout = real;
+    });
+    await page.waitForFunction(function () { return window.fakeAvplay.state === 'NONE'; });
+    await page.evaluate(function () { Player.resume(); });
+    await waitOpens(opens + 1);
+    assert.strictEqual(await lastOpen(), 'http://x.test/live/demo/demo/2.ts', 'dopo la pausa lunga riapre la diretta');
+    await page.evaluate(function () { Player.stop(); });
+  });
+
   await step('film lento a caricare: nessun riavvio, avviso a schermo, riavvio solo dopo molto', async function () {
     var opens = await page.evaluate(function () {
       var fake = window.fakeAvplay;

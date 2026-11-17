@@ -56,6 +56,8 @@
         // Sezione all'apertura: 'launcher' = Home a riquadri (solo TV), 'last' = ultima usata.
         startSection: settings.startSection || 'launcher',
         resumeLastChannel: settings.resumeLastChannel !== false,
+        // TV: INDIETRO da un canale lo chiude del tutto (altrimenti resta nel riquadro e tiene la connessione col provider).
+        backStops: settings.backStops === true,
         playerSwipe: settings.playerSwipe === true, // app Android: cambio canale scorrendo sul video
         screensaverMin: typeof settings.screensaverMin === 'number' ? settings.screensaverMin : 5, // 0 = mai
         followTerms: settings.followTerms || '', // "Le tue partite": parole da cercare nella guida

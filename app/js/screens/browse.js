@@ -1097,6 +1097,15 @@
       startButton.textContent = startLabel();
     });
 
+    var backStopsLabel = function () {
+      return 'INDIETRO da un canale: ' + (App.settings.backStops ? 'lo spegne del tutto' : 'lo lascia nel riquadro');
+    };
+    var backStopsButton = Platform.isTV ? settingButton('setting-back-stops', backStopsLabel(), function () {
+      App.settings.backStops = !App.settings.backStops;
+      App.saveSettings();
+      backStopsButton.textContent = backStopsLabel();
+    }) : null;
+
     var swipeLabel = function () {
       return 'Cambio canale scorrendo sul video: ' + (App.settings.playerSwipe ? 'Sì' : 'No');
     };
@@ -1228,6 +1237,7 @@
         h('p.hint', { text: 'Se un canale non parte, prova a cambiare formato.' }),
         startButton,
         lastChannelButton,
+        backStopsButton,
         swipeButton,
         saverButton,
         idleButton,
