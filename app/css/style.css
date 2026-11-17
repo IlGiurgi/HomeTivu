@@ -2689,3 +2689,209 @@ html.mobile .remote-on .topbar { padding-top: 8px; }
 html.mobile .row-epg.overflows { text-overflow: clip; }
 html.mobile .row-epg.overflows > span { display: inline-block; animation: epg-marquee 7s ease-in-out 1.5s infinite alternate; }
 @keyframes epg-marquee { to { transform: translateX(var(--epg-shift)); } }
+
+/* ---------- Telefono: menu laterale con burger ed elenco categorie a pannello ---------- */
+
+.mobile-only { display: none; }
+
+html.mobile .mobile-only { display: block; }
+
+html.mobile .topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top)) 10px 4px;
+}
+
+html.mobile .burger,
+html.mobile .top-search {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #171a24;
+  color: #f2f4f8;
+  font-size: 20px;
+  line-height: 40px;
+  text-align: center;
+}
+
+html.mobile .top-search { font-size: 26px; }
+
+html.mobile .top-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Le sezioni diventano il menu laterale. */
+html.mobile .tabs {
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 78%;
+  max-width: 320px;
+  flex: none;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: calc(20px + env(safe-area-inset-top)) 10px calc(16px + env(safe-area-inset-bottom));
+  background: #171a24;
+  transform: translateX(-105%);
+  transition: transform 0.22s;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+}
+
+html.mobile .drawer-open .tabs { transform: none; }
+
+html.mobile .tabs::before {
+  content: 'HomeTivu';
+  display: block;
+  padding: 0 10px 14px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffb92e;
+}
+
+html.mobile .tabs .tab {
+  flex: none;
+  margin: 0;
+  padding: 13px 12px;
+  border-radius: 10px;
+  font-size: 16px;
+  text-align: left;
+  color: #f2f4f8;
+  background: none;
+}
+
+html.mobile .tabs .tab::before {
+  display: inline-block;
+  width: 28px;
+  color: #98a0b3;
+}
+
+html.mobile .tab[data-tab="live"]::before { content: '\25B6'; }
+html.mobile .tab[data-tab="guide"]::before { content: '\25A4'; }
+html.mobile .tab[data-tab="vod"]::before { content: '\25A3'; }
+html.mobile .tab[data-tab="series"]::before { content: '\25A6'; }
+html.mobile .tab[data-tab="favorites"]::before { content: '\2605'; }
+html.mobile .tab[data-tab="search"]::before { content: '\2315'; }
+html.mobile .tab[data-tab="settings"]::before { content: '\2699'; }
+html.mobile .tab[data-tab="search"] { margin-top: 10px; border-top: 1px solid #262b3b; border-radius: 0 0 10px 10px; }
+
+html.mobile #app .tabs .tab.selected,
+html.mobile #app .tabs .tab.selected.focused {
+  background: #222635;
+  color: #ffb92e;
+  font-weight: bold;
+  box-shadow: none;
+}
+
+html.mobile #app .tabs .tab.selected::before { color: #ffb92e; }
+html.mobile #app .tabs .tab.focused { background: none; box-shadow: none; color: #f2f4f8; }
+
+html.mobile .menu-scrim {
+  position: fixed;
+  z-index: 55;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+html.mobile .drawer-open .menu-scrim,
+html.mobile .sheet-open .menu-scrim { opacity: 1; pointer-events: auto; }
+
+/* Categorie: un solo pulsante sotto il titolo, l'elenco si apre dal basso. */
+html.mobile .cat-pill {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 0 6px;
+  padding: 10px 14px;
+  border: 1px solid #262b3b;
+  border-radius: 12px;
+  background: #171a24;
+  color: #f2f4f8;
+  font: inherit;
+  font-weight: bold;
+  text-align: left;
+}
+
+html.mobile .cat-pill-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+html.mobile .cat-pill-count { flex: none; font-weight: normal; color: #98a0b3; font-size: 13px; }
+html.mobile .no-categories .cat-pill,
+html.mobile .cat-inline .cat-pill { display: none; }
+
+/* In ricerca il campo resta nella pagina, come prima. */
+html.mobile .cat-inline .categories { display: flex; }
+
+html.mobile #screen-browse:not(.cat-inline) .categories {
+  position: fixed;
+  z-index: 60;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  display: block;
+  width: auto;
+  max-height: 70%;
+  margin: 0;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: 20px 20px 0 0;
+  background: #171a24;
+  transform: translateY(105%);
+  transition: transform 0.22s;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+}
+
+html.mobile #screen-browse.sheet-open .categories { transform: none; }
+html.mobile #screen-browse.no-categories .categories { display: none; }
+
+html.mobile #screen-browse:not(.cat-inline) .category {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 13px 10px;
+  border-radius: 0;
+  border-bottom: 1px solid #262b3b;
+  background: none;
+}
+
+html.mobile #screen-browse:not(.cat-inline) .category.selected {
+  background: none;
+  box-shadow: none;
+  color: #ffb92e;
+  font-weight: bold;
+}
+
+html.mobile #screen-browse:not(.cat-inline) .category-name { max-width: none; flex: 1; min-width: 0; }
+
+html.mobile .cat-filter {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border: 1px solid #262b3b;
+  border-radius: 10px;
+  background: #0f1117;
+  color: #f2f4f8;
+  font: inherit;
+}
+
+/* Il titolo della lista ripeterebbe il nome sul pulsante delle categorie. */
+html.mobile #screen-browse:not(.cat-inline):not(.no-categories) .items-title { display: none; }

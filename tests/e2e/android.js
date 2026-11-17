@@ -106,6 +106,21 @@ async function main() {
     await page.waitForTimeout(400);
   }
 
+  /** Apre il menu laterale (burger) e sceglie una sezione. */
+  async function openSection(id) {
+    await page.tap('.burger');
+    await page.waitForTimeout(300);
+    await page.tap('.tabs .tab[data-tab="' + id + '"]');
+    await page.waitForTimeout(300);
+  }
+  /** Apre l'elenco categorie a pannello e ne sceglie una. */
+  async function pickCategory(id) {
+    await page.tap('.cat-pill');
+    await page.waitForTimeout(300);
+    await page.tap('.category[data-category="' + id + '"]');
+    await page.waitForTimeout(300);
+  }
+
   function selectedTab() {
     return page.evaluate(function () { return document.querySelector('.tab.selected').getAttribute('data-tab'); });
   }
@@ -127,8 +142,34 @@ async function main() {
     assert.strictEqual(await page.evaluate(function () { return window.fakeAndroid.backListeners.length; }), 1);
   });
 
+  await step('menu laterale: si apre col burger, si chiude toccando fuori e con Indietro; categorie a pannello', async function () {
+    var drawerLeft = function () { return page.evaluate(function () { return document.querySelector('.tabs').getBoundingClientRect().left; }); };
+    assert.ok(await drawerLeft() < 0, 'il menu parte chiuso');
+    await page.tap('.burger');
+    await page.waitForTimeout(400);
+    assert.strictEqual(await drawerLeft(), 0, 'il burger apre il menu');
+    await page.tap('.menu-scrim', { position: { x: 380, y: 400 } });
+    await page.waitForTimeout(400);
+    assert.ok(await drawerLeft() < 0, 'toccando fuori il menu si chiude');
+    await page.tap('.burger');
+    await page.waitForTimeout(300);
+    await pressAndroidBack();
+    await page.waitForTimeout(400);
+    assert.ok(await drawerLeft() < 0, 'Indietro chiude il menu senza uscire');
+    assert.ok(await page.evaluate(function () { return !window.fakeAndroid.exited; }));
+    await page.tap('.cat-pill');
+    await page.waitForTimeout(400);
+    var sheetTop = await page.evaluate(function () { return document.querySelector('.categories').getBoundingClientRect().top; });
+    assert.ok(sheetTop < 852, 'il pulsante apre le categorie');
+    await page.tap('.category >> nth=2');
+    await page.waitForTimeout(400);
+    assert.ok(await page.evaluate(function () { return document.querySelector('.categories').getBoundingClientRect().top >= 852; }),
+      'scelta una categoria il pannello si chiude');
+    assert.ok((await page.textContent('.cat-pill-name')).length > 0, 'il pulsante mostra la categoria scelta');
+  });
+
   await step('scorrimento col dito: lista canali (con caricamento a blocchi) e dettaglio serie', async function () {
-    await page.tap('.category[data-category="*"]');
+    await pickCategory('*');
     assert.strictEqual(await page.locator('.items .row').count(), 60);
     for (var i = 0; i < 12 && await page.locator('.items .row').count() <= 60; i++) await swipeUp('.items');
     assert.ok(await page.evaluate(function () { return document.querySelector('.items').scrollTop > 0; }),
@@ -136,7 +177,7 @@ async function main() {
     assert.ok(await page.locator('.items .row').count() > 60, 'scorrendo si caricano i canali successivi');
 
     await page.waitForTimeout(1000); // dopo lo scorrimento col dito un tocco immediato può andare perso
-    await page.tap('.tab[data-tab="series"]');
+    await openSection('series');
     await page.waitForSelector('.items .card');
     await page.tap('.items .card >> nth=0');
     await page.waitForSelector('#screen-detail.active .episode');
@@ -145,14 +186,14 @@ async function main() {
       'il dettaglio della serie deve scorrere col dito');
     await pressAndroidBack();
     await page.waitForSelector('#screen-browse.active');
-    await page.tap('.tab[data-tab="live"]');
+    await openSection('live');
     await page.waitForSelector('.items .row');
   });
 
   await step('preferiti col dito: pressione prolungata aggiunge e rimuove, senza aprire il canale', async function () {
-    await page.tap('.tab[data-tab="favorites"]');
+    await openSection('favorites');
     assert.match(await page.textContent('.items'), /tieni premuto/);
-    await page.tap('.tab[data-tab="live"]');
+    await openSection('live');
     await page.waitForSelector('.items .row');
     var playsBefore = await page.evaluate(function () { return window.fakeAndroid.plays.length; });
     await longPress('.items .row >> nth=0');
@@ -162,11 +203,11 @@ async function main() {
     assert.strictEqual(await page.evaluate(function () { return window.fakeAndroid.plays.length; }), playsBefore,
       'la pressione prolungata non deve aprire il canale');
     assert.strictEqual(await page.evaluate(function () { return document.querySelector('.screen.active').id; }), 'screen-browse');
-    await page.tap('.tab[data-tab="favorites"]');
+    await openSection('favorites');
     assert.strictEqual(await page.locator('.items .row').count(), 1);
     await longPress('.items .row >> nth=0');
     assert.strictEqual(await page.locator('.items .row').count(), 0, 'seconda pressione: rimosso');
-    await page.tap('.tab[data-tab="live"]');
+    await openSection('live');
     await page.waitForSelector('.items .row');
   });
 
@@ -219,7 +260,7 @@ async function main() {
   });
 
   await step('film: ripresa salvata alla chiusura del lettore', async function () {
-    await page.tap('.tab[data-tab="vod"]');
+    await openSection('vod');
     await page.waitForSelector('.items .card');
     await page.tap('.items .card >> nth=0');
     await page.waitForFunction(function () { return Nav.current && Nav.current.textContent === '▶ Riproduci'; });
@@ -245,7 +286,7 @@ async function main() {
     await pressAndroidBack();
     await page.waitForSelector('#screen-browse.active');
     await page.evaluate(function () { Storage.setResume('episode:800111', 500, 2700); });
-    await page.tap('.tab[data-tab="series"]');
+    await openSection('series');
     await page.waitForSelector('.items .card');
     await page.tap('.items .card >> nth=0');
     await page.waitForSelector('.episode');
@@ -265,7 +306,7 @@ async function main() {
   await step('certificato non valido: eccezione solo se spuntata, rimossa se il login fallisce e al logout', async function () {
     await pressAndroidBack();
     await page.waitForSelector('#screen-browse.active');
-    await page.tap('.tab[data-tab="settings"]');
+    await openSection('settings');
     await page.tap('#setting-logout');
     await page.waitForSelector('#screen-login.active #login-trust');
     function trusted() { return page.evaluate(function () { return window.fakeAndroid.trustedHosts.slice(); }); }
@@ -287,9 +328,9 @@ async function main() {
     assert.strictEqual(await page.evaluate(function () {
       return JSON.parse(localStorage.getItem('xtreamtv.account')).insecureTls;
     }), true);
-    await page.tap('.tab[data-tab="settings"]');
+    await openSection('settings');
     assert.match(await page.textContent('.settings-panel'), /Non valido, accettato per localhost/);
-    await page.tap('.tab[data-tab="live"]');
+    await openSection('live');
   });
 
   await step('tasto Indietro di Android: risale e poi chiude l\'app', async function () {

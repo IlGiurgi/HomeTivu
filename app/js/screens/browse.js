@@ -86,13 +86,74 @@
 
   TABS.forEach(function (tab) {
     var tabEl = h('div.tab.focusable', { 'data-zone': 'browse-tabs', 'data-tab': tab.id, text: tab.label });
-    tabEl.onSelect = function () { selectSection(tab.id); };
+    tabEl.onSelect = function () { closeOverlays(); selectSection(tab.id); };
     tabsEl.appendChild(tabEl);
+  });
+
+  // ---------- Telefono: menu laterale (burger) ed elenco categorie a pannello ----------
+  // Questi elementi si vedono solo con html.mobile; sulla TV restano nascosti e non cambia nulla.
+
+  var burgerEl = h('button.burger.mobile-only', { type: 'button', 'aria-label': 'Menu', text: '\u2630' });
+  var titleTopEl = h('div.top-title.mobile-only');
+  var searchTopEl = h('button.top-search.mobile-only', { type: 'button', 'aria-label': 'Cerca', text: '\u2315' });
+  var scrimEl = h('div.menu-scrim.mobile-only');
+  var catPillEl = h('button.cat-pill.mobile-only', { type: 'button' }, [
+    h('span.cat-pill-name'), h('span.cat-pill-count')
+  ]);
+  var topbarEl = el.querySelector('.topbar');
+  topbarEl.insertBefore(burgerEl, topbarEl.firstChild);
+  topbarEl.insertBefore(titleTopEl, tabsEl);
+  topbarEl.appendChild(searchTopEl);
+  el.appendChild(scrimEl);
+  el.querySelector('.browse-body').insertBefore(catPillEl, categoriesEl);
+
+  var catFilterEl = h('input.cat-filter', { type: 'text', placeholder: 'Cerca categoria', autocomplete: 'off', spellcheck: 'false' });
+  function filterCategories(text) {
+    var query = String(text || '').trim().toLowerCase();
+    Array.prototype.forEach.call(categoriesEl.querySelectorAll('.category'), function (catEl) {
+      var name = catEl.querySelector('.category-name').textContent.toLowerCase();
+      catEl.style.display = !query || name.indexOf(query) !== -1 ? '' : 'none';
+    });
+  }
+  catFilterEl.addEventListener('input', function () { filterCategories(catFilterEl.value); });
+
+  function closeOverlays() {
+    el.classList.remove('drawer-open', 'sheet-open');
+  }
+  function overlayOpen() {
+    return el.classList.contains('drawer-open') || el.classList.contains('sheet-open');
+  }
+  burgerEl.addEventListener('click', function () {
+    el.classList.remove('sheet-open');
+    el.classList.add('drawer-open');
+  });
+  scrimEl.addEventListener('click', closeOverlays);
+  searchTopEl.addEventListener('click', function () { closeOverlays(); selectSection('search'); });
+  catPillEl.addEventListener('click', function () {
+    el.classList.remove('drawer-open');
+    el.classList.add('sheet-open');
+    // Con molte categorie compare un campo per filtrarle per nome.
+    var cats = categoriesEl.querySelectorAll('.category');
+    if (cats.length > 10 && catFilterEl.parentNode !== categoriesEl) categoriesEl.insertBefore(catFilterEl, categoriesEl.firstChild);
+    catFilterEl.value = '';
+    filterCategories('');
+    var selected = categoriesEl.querySelector('.category.selected');
+    if (selected) categoriesEl.scrollTop = Math.max(0, selected.offsetTop - 120);
+  });
+  // Scelta una categoria il pannello si chiude da solo.
+  categoriesEl.addEventListener('click', function (event) {
+    var target = event.target;
+    while (target && target !== categoriesEl) {
+      if (target.classList && target.classList.contains('category')) { closeOverlays(); return; }
+      target = target.parentNode;
+    }
   });
 
   function markActiveTab() {
     Array.prototype.forEach.call(tabsEl.children, function (tabEl) {
-      tabEl.classList.toggle('selected', tabEl.getAttribute('data-tab') === state.section);
+      var active = tabEl.getAttribute('data-tab') === state.section;
+      tabEl.classList.toggle('selected', active);
+      if (active) titleTopEl.textContent = tabEl.textContent;
     });
   }
 
@@ -145,6 +206,10 @@
     markActiveTab();
     el.classList.toggle('no-categories', section === 'settings' || section === 'home');
     el.classList.toggle('section-home', section === 'home');
+    el.classList.toggle('cat-inline', section === 'search'); // nella ricerca il campo resta in pagina, non nel pannello
+    closeOverlays();
+    catPillEl.querySelector('.cat-pill-name').textContent = '';
+    catPillEl.querySelector('.cat-pill-count').textContent = '';
     renderMini(); // il lato del riquadro del canale dipende dalla sezione
     Nav.forgetZone('browse-cats');
     Nav.forgetZone('browse-items');
@@ -184,7 +249,12 @@
 
   function markActiveCategory() {
     Array.prototype.forEach.call(categoriesEl.children, function (catEl) {
-      catEl.classList.toggle('selected', catEl.getAttribute('data-category') === state.categoryId);
+      var active = catEl.getAttribute('data-category') === state.categoryId;
+      catEl.classList.toggle('selected', active);
+      if (active && catEl.classList.contains('category')) {
+        catPillEl.querySelector('.cat-pill-name').textContent = catEl.querySelector('.category-name').textContent;
+        catPillEl.querySelector('.cat-pill-count').textContent = catEl.querySelector('.category-count').textContent + ' \u25BE';
+      }
     });
   }
 
@@ -1591,7 +1661,7 @@
     enter: function (params) {
       if (isTouch() && !Storage.getFlag('touchTips')) {
         Storage.setFlag('touchTips');
-        UI.toast('Suggerimento: tieni premuto un contenuto per i preferiti, scorri a destra o sinistra per cambiare sezione', 7000);
+        UI.toast('Suggerimento: tieni premuto un contenuto per i preferiti, scorri a destra o sinistra per cambiare categoria, il tasto \u2630 apre le sezioni', 7000);
       }
       MiniPlayer.onChange = renderMini;
       renderMini();
@@ -1617,6 +1687,10 @@
       });
     },
     handleKey: function (action) {
+      if (action === 'back' && overlayOpen()) {
+        closeOverlays();
+        return true;
+      }
       if ((action === 'chup' || action === 'chdown') && Nav.current && Nav.current.onChannel) {
         Nav.current.onChannel(action === 'chup' ? 1 : -1); // clima: CH+ / CH- cambiano la temperatura impostata
         return true;
