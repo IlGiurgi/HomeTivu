@@ -78,6 +78,8 @@ async function main() {
 
   await page.goto(base);
   await page.waitForSelector('#screen-browse.active .items .row');
+  // Il test apre molti stream di fila: senza azzeramento scatterebbe il tetto di aperture (openlimit.js).
+  await page.evaluate(function () { window.setInterval(window.OpenLimit.reset, 50); });
 
   await step('canale live: URL .ts e trasparenza per il piano video', async function () {
     await press('ArrowDown');

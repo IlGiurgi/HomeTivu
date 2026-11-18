@@ -367,6 +367,20 @@
     var id = ++session;
     var url = sources[sourceIndex].url;
     var now = Date.now();
+    // Tetto globale di aperture (vedi openlimit.js): oltre, si aspetta invece di rischiare il blocco dell'IP.
+    var limitWait = root.OpenLimit.wait(now);
+    if (limitWait > 0) {
+      note('troppe aperture ravvicinate: attendo ' + Math.ceil(limitWait / 1000) + ' s per non farmi bloccare dal provider');
+      Player.url = url;
+      Player.paused = false;
+      emit('buffering');
+      retryTimer = setTimeout(function () {
+        retryTimer = null;
+        if (sources.length && session === id) openSource(startAt);
+      }, limitWait);
+      return;
+    }
+    root.OpenLimit.record(now);
     Player.url = url;
     Player.paused = false;
     watch = { openedAt: now, prepared: false, bufferingSince: 0, lastTime: null, lastProgress: now, advanced: false, startAt: startAt, warned: false };
