@@ -41,7 +41,7 @@
     sending = true;
     // "aggiornato" cambia a ogni invio (anche al battito): il telefono lo usa per capire se la TV è ancora viva.
     // Non entra nel confronto "è cambiato?" (json), altrimenti ogni controllo sembrerebbe una novità.
-    var payload = { state: last.state, attributes: Object.assign({}, last.attributes, { aggiornato: new Date().toISOString(), collegamento: (root.Home && root.Home.status.ws) || '', ultimo_comando: (root.Remote && root.Remote.last) || '' }) };
+    var payload = { state: last.state, attributes: Object.assign({}, last.attributes, { aggiornato: new Date().toISOString(), collegamento: (root.Home && root.Home.status.ws) || '', ultimo_comando: (root.Remote && root.Remote.last) || '', registro: root.Netlog ? root.Netlog.lines(40).join('\n') : '' }) };
     Home.request('/api/states/' + entityId, payload).then(function () {
       lastJson = json;
       lastSent = Date.now();

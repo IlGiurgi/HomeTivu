@@ -75,6 +75,7 @@
 
   function note(text) {
     history.push({ at: Date.now(), text: text });
+    if (root.Netlog) root.Netlog.add('video ' + text);
     if (history.length > 30) history.shift();
     try { root.console.log('[player] ' + text); } catch (e) { /* console assente */ }
   }
@@ -381,6 +382,7 @@
       return;
     }
     root.OpenLimit.record(now);
+    if (root.Netlog) root.Netlog.add('apertura ' + root.Netlog.describeStream(url) + (sourceIndex ? ' (feed alternativo)' : ''));
     Player.url = url;
     Player.paused = false;
     watch = { openedAt: now, prepared: false, bufferingSince: 0, lastTime: null, lastProgress: now, advanced: false, startAt: startAt, warned: false };

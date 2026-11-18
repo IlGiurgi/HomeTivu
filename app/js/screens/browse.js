@@ -1268,12 +1268,12 @@
 
     // Cronologia dei riavvii dello stream: dice perché un canale si è ricaricato da solo.
     var historyListing = h('div.feed-listing');
-    var historyButton = settingButton('setting-player-history', 'Ultimi riavvii del video', function () {
+    var historyButton = settingButton('setting-player-history', 'Registro richieste e riavvii (ultime 60)', function () {
       UI.clear(historyListing);
-      var entries = Player.history().reverse();
-      if (!entries.length) historyListing.appendChild(h('p.hint', { text: 'Nessun riavvio registrato da quando l\'app è aperta.' }));
-      entries.forEach(function (entry) {
-        historyListing.appendChild(h('p.hint', { text: UI.formatClock(entry.at) + '  ' + entry.text }));
+      var entries = Netlog.lines(60).reverse();
+      if (!entries.length) historyListing.appendChild(h('p.hint', { text: 'Nessuna richiesta registrata.' }));
+      entries.forEach(function (line) {
+        historyListing.appendChild(h('p.hint', { text: line }));
       });
     });
 

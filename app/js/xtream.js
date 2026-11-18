@@ -107,8 +107,13 @@
   /** Richiesta GET JSON; se il server risponde 404 o 5xx la ripete un paio di volte prima di arrendersi. */
   function xhrJson(url, timeout, noRetry) {
     var attempt = 0;
+    var what = typeof Netlog !== 'undefined' ? Netlog.describeApi(url) : '';
     function run() {
-      return xhrJsonOnce(url, timeout).then(null, function (err) {
+      return xhrJsonOnce(url, timeout).then(function (data) {
+        if (what) Netlog.add('api ' + what + ' -> 200');
+        return data;
+      }, function (err) {
+        if (what) Netlog.add('api ' + what + ' -> ' + (err.status || (err.network ? 'rete/CORS' : 'errore')) + (attempt ? ' (tentativo ' + (attempt + 1) + ')' : ''));
         if (noRetry || !err.retryable || attempt >= RETRY_DELAYS.length) throw err;
         var delay = RETRY_DELAYS[attempt++];
         return new Promise(function (resolve) { setTimeout(resolve, delay); }).then(run);
@@ -209,7 +214,10 @@
         throw blocked;
       }
       return self.request(url, undefined, true).then(null, function (err) {
-        if (err && (err.status === 403 || err.status === 429)) self.epgBlockedUntil = Date.now() + EPG_BLOCK_MS;
+        if (err && (err.status === 403 || err.status === 429)) {
+          self.epgBlockedUntil = Date.now() + EPG_BLOCK_MS;
+          if (typeof Netlog !== 'undefined') Netlog.add('guida sospesa per ' + EPG_BLOCK_MS / 1000 + ' s dopo HTTP ' + err.status);
+        }
         throw err;
       });
     };
