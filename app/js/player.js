@@ -69,6 +69,7 @@
   // aspetta prima di aprire il nuovo; con lo zapping veloce parte solo l'ultimo canale scelto.
   var SWITCH_GAP_MS = 1500;
   var openTimer = null;
+  var lastCloseAt = 0; // quando è stato chiuso per ultimo uno stream che era aperto
   var watch = {};
   var suspendedAt = 0;
   var history = []; // ultimi riavvii dello stream e il loro motivo (Impostazioni > diagnosi)
@@ -324,13 +325,15 @@
       // stop e close separati: se stop() rifiuta (player non in riproduzione) close() deve comunque liberare la connessione.
       try {
         if (avplay.getState() !== 'NONE') {
+          lastCloseAt = Date.now();
           try { avplay.stop(); } catch (e) { /* non in riproduzione */ }
           avplay.close();
         }
       } catch (e) { /* già chiuso */ }
     } else {
-      destroyEngine();
       var video = html5();
+      if (engine || video.getAttribute('src')) lastCloseAt = Date.now();
+      destroyEngine();
       video.pause();
       video.removeAttribute('src');
       video.load();
@@ -361,7 +364,7 @@
   }
 
   /** Apre il feed corrente (sources[sourceIndex]) da capo. */
-  function openSource(startAt) {
+  function openSource(startAt, gapDone) {
     clearTimeout(retryTimer);
     retryTimer = null;
     closeEngine();
@@ -369,15 +372,18 @@
     var url = sources[sourceIndex].url;
     var now = Date.now();
     // Tetto globale di aperture (vedi openlimit.js): oltre, si aspetta invece di rischiare il blocco dell'IP.
-    var limitWait = root.OpenLimit.wait(now);
+    // Pausa minima dopo la chiusura di uno stream: il provider tiene ancora per un attimo la connessione appena
+    // chiusa e vedrebbe due connessioni insieme (vale per ogni via: zapping, riavvio, ricarica, riquadro).
+    var gapWait = gapDone ? 0 : Math.min(SWITCH_GAP_MS, SWITCH_GAP_MS - (now - lastCloseAt));
+    var limitWait = Math.max(root.OpenLimit.wait(now), gapWait);
     if (limitWait > 0) {
-      note('troppe aperture ravvicinate: attendo ' + Math.ceil(limitWait / 1000) + ' s per non farmi bloccare dal provider');
+      if (limitWait > SWITCH_GAP_MS) note('troppe aperture ravvicinate: attendo ' + Math.ceil(limitWait / 1000) + ' s per non farmi bloccare dal provider');
       Player.url = url;
       Player.paused = false;
       emit('buffering');
       retryTimer = setTimeout(function () {
         retryTimer = null;
-        if (sources.length && session === id) openSource(startAt);
+        if (sources.length && session === id) openSource(startAt, true);
       }, limitWait);
       return;
     }

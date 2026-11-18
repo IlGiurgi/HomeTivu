@@ -234,7 +234,25 @@ async function main() {
     await page.evaluate(function () { Player.stop(); });
   });
 
+  await step('stop e subito play (zapping a schermo intero, riquadro chiuso): pausa minima prima di aprire il nuovo flusso', async function () {
+    await page.evaluate(function () { Player.play('http://x.test/live/demo/demo/1.ts', 0, true); });
+    await page.waitForFunction(function () { return window.fakeAvplay.state === 'PLAYING'; });
+    var opens = await page.evaluate(function () {
+      return window.fakeAvplay.calls.filter(function (c) { return c[0] === 'open'; }).length;
+    });
+    await page.evaluate(function () { Player.stop(); Player.play('http://x.test/live/demo/demo/2.ts', 0, true); });
+    await page.waitForTimeout(600);
+    assert.strictEqual(await page.evaluate(function () { return window.fakeAvplay.state; }), 'NONE', 'il flusso vecchio è chiuso');
+    assert.strictEqual(await page.evaluate(function () {
+      return window.fakeAvplay.calls.filter(function (c) { return c[0] === 'open'; }).length;
+    }), opens, 'dopo 0,6 s il nuovo flusso non è ancora aperto');
+    await waitOpens(opens + 1);
+    assert.strictEqual(await lastOpen(), 'http://x.test/live/demo/demo/2.ts');
+    await page.evaluate(function () { Player.stop(); });
+  });
+
   await step('film lento a caricare: nessun riavvio, avviso a schermo, riavvio solo dopo molto', async function () {
+    await page.waitForTimeout(1600); // pausa minima dopo la chiusura dello stream precedente: poi l'apertura è immediata
     var opens = await page.evaluate(function () {
       var fake = window.fakeAvplay;
       window.savedPrepare = fake.prepareAsync;
