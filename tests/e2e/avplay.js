@@ -209,6 +209,29 @@ async function main() {
     await page.evaluate(function () { Player.stop(); });
   });
 
+  await step('cambio canale: il vecchio flusso si chiude, il nuovo si apre dopo una pausa e con lo zapping parte solo l\'ultimo', async function () {
+    await page.evaluate(function () { Player.play('http://x.test/live/demo/demo/1.ts', 0, true); });
+    await page.waitForFunction(function () { return window.fakeAvplay.state === 'PLAYING'; });
+    var opens = await page.evaluate(function () {
+      return window.fakeAvplay.calls.filter(function (c) { return c[0] === 'open'; }).length;
+    });
+    await page.evaluate(function () {
+      Player.play('http://x.test/live/demo/demo/2.ts', 0, true);
+      Player.play('http://x.test/live/demo/demo/3.ts', 0, true);
+    });
+    assert.strictEqual(await page.evaluate(function () { return window.fakeAvplay.state; }), 'NONE', 'vecchio flusso chiuso subito');
+    assert.strictEqual(await page.evaluate(function () {
+      return window.fakeAvplay.calls.filter(function (c) { return c[0] === 'open'; }).length;
+    }), opens, 'il nuovo canale non si apre subito');
+    await waitOpens(opens + 1);
+    assert.strictEqual(await lastOpen(), 'http://x.test/live/demo/demo/3.ts', 'si apre solo l\'ultimo canale scelto');
+    await page.waitForTimeout(2000);
+    assert.strictEqual(await page.evaluate(function () {
+      return window.fakeAvplay.calls.filter(function (c) { return c[0] === 'open'; }).length;
+    }), opens + 1, 'nessuna apertura in più');
+    await page.evaluate(function () { Player.stop(); });
+  });
+
   await step('film lento a caricare: nessun riavvio, avviso a schermo, riavvio solo dopo molto', async function () {
     var opens = await page.evaluate(function () {
       var fake = window.fakeAvplay;

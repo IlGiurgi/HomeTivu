@@ -61,6 +61,11 @@
   var parked = false; // diretta in pausa da tempo: stream chiuso per non occupare una connessione del provider
   var parkTimer = null;
   var PARK_MS = 60000;
+  // Cambio canale: il provider tiene ancora aperta per un attimo la connessione appena chiusa e, con un limite di
+  // 1-2 connessioni, risponde 403 o blocca l'IP se se ne apre subito un'altra. Si chiude il vecchio flusso e si
+  // aspetta prima di aprire il nuovo; con lo zapping veloce parte solo l'ultimo canale scelto.
+  var SWITCH_GAP_MS = 1500;
+  var openTimer = null;
   var watch = {};
   var suspendedAt = 0;
   var history = []; // ultimi riavvii dello stream e il loro motivo (Impostazioni > diagnosi)
@@ -89,10 +94,25 @@
      * @param {boolean} [live] diretta: si riapre dal vivo e la fine dello stream è un'interruzione da recuperare
      */
     play: function (url, startAt, live) {
+      var hadStream = !!this.url;
       this.stop();
       sources = [{ url: url, label: '' }];
       isLive = !!live;
-      openSource(startAt || 0);
+      if (!hadStream) {
+        openSource(startAt || 0);
+        return;
+      }
+      // Stream precedente appena chiuso: pausa prima di aprire il nuovo (vedi SWITCH_GAP_MS).
+      var id = ++session;
+      var now = Date.now();
+      this.url = url;
+      this.paused = false;
+      watch = { openedAt: now, prepared: false, bufferingSince: 0, lastTime: null, lastProgress: now, advanced: false, startAt: startAt || 0, warned: false };
+      emit('buffering');
+      openTimer = setTimeout(function () {
+        openTimer = null;
+        if (id === session && sources.length) openSource(startAt || 0);
+      }, SWITCH_GAP_MS);
     },
 
     /** Feed alternativi del contenuto appena avviato ([{url, label}]), usati se lo stream si blocca. */
@@ -127,6 +147,8 @@
     },
 
     stop: function () {
+      clearTimeout(openTimer);
+      openTimer = null;
       clearTimeout(parkTimer);
       parked = false;
       this.url = null;
