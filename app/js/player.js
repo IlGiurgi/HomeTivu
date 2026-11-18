@@ -30,6 +30,9 @@
   var WEB_ERROR = 'Impossibile riprodurre nel browser: il server potrebbe bloccare le richieste dal web ' +
     'o lo stream non è compatibile. Sulla TV dovrebbe funzionare.';
 
+  var CODEC_ERROR = 'Questo canale ha un audio (E-AC3 / Dolby Digital Plus) che questo browser non riproduce. ' +
+    'Prova un altro canale, un altro browser (Edge con l\'estensione Dolby) oppure usa la TV o il telefono.';
+
   var OPEN_MS = 12000; // apertura dello stream
   var BUFFERING_MS = 8000; // caricamento a metà visione che non finisce (dirette)
   var STALL_MS = 5000; // immagine ferma: il tempo non avanza e il player non dice nulla (dirette)
@@ -647,7 +650,18 @@
     engine = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: url }, {
       enableStashBuffer: false, liveBufferLatencyChasing: true
     });
-    engine.on(mpegts.Events.ERROR, function () { if (current()) fail(WEB_ERROR); });
+    engine.on(mpegts.Events.ERROR, function (type, detail, info) {
+      if (!current()) return;
+      var text = (info && info.msg ? String(info.msg) : '') + ' ' + (detail || '');
+      // Codec non supportato dal browser (tipico l'audio E-AC3 / Dolby Digital Plus): riaprire lo stream non serve a
+      // nulla e carica solo il provider con connessioni inutili, quindi niente tentativi.
+      if (/addSourceBuffer|unsupported|MediaSource/i.test(text) && /ec-3|ac-3|eac3|unsupported/i.test(text)) {
+        note('codec non supportato dal browser: ' + text.trim().slice(0, 160));
+        giveUp(CODEC_ERROR);
+        return;
+      }
+      fail(WEB_ERROR);
+    });
     engine.attachMediaElement(video);
     engine.load();
     startVideo(video);
