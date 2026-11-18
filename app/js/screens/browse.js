@@ -300,6 +300,8 @@
     Nav.forgetZone('browse-items');
     titleEl.textContent = title || '';
     epgQueue.length = 0;
+    clearTimeout(epgPumpTimer);
+    epgPumpTimer = null;
     showEpgInfo(null);
     UI.clear(itemsEl);
     itemsEl.className = 'items scroll layout-' + layout;
@@ -363,9 +365,10 @@
     itemEl.item = item;
     if (live && itemEl.querySelector('.row-epg')) {
       updateRowEpg(itemEl);
-      requestEpg(item.id);
+      if (index < EPG_VISIBLE) requestEpg(item.id);
     }
     itemEl.onFocusIn = function () {
+      requestEpgAhead(index);
       if (state.layout === 'grid') itemsEl.classList.add('card-focus');
       if (index >= state.rendered - PRELOAD_THRESHOLD) renderMore();
       showEpgInfo(item.type === 'live' ? item : null);
@@ -379,7 +382,11 @@
   // La guida si chiede canale per canale (get_short_epg), solo per le righe già mostrate,
   // poche richieste alla volta per non rallentare la TV, e resta in memoria per qualche minuto.
   var EPG_TTL = 5 * 60000;
-  var EPG_PARALLEL = 2;
+  var EPG_PARALLEL = 1;
+  var EPG_VISIBLE = 12; // righe per cui la guida si chiede subito; le altre quando ci si arriva con il focus
+  var EPG_AHEAD = 8; // righe davanti a quella selezionata
+  var EPG_DWELL_MS = 600; // dopo un cambio categoria si aspetta un attimo: scorrendo in fretta non parte niente
+  var epgPumpTimer = null;
   var EPG_LIMIT = 8; // programmi per canale: bastano per le 3 ore della guida a griglia
   var epgCache = {}; // id canale -> {at, list, loading}
   var epgQueue = [];
@@ -405,7 +412,19 @@
     pumpEpg();
   }
 
+  function requestEpgAhead(index) {
+    for (var i = index; i < Math.min(state.items.length, index + EPG_AHEAD); i++) {
+      if (state.items[i].type === 'live') requestEpg(state.items[i].id);
+    }
+  }
+
   function pumpEpg() {
+    if (epgRunning || epgPumpTimer) return; // in corso: le richieste in coda partono a mano a mano che finiscono
+    epgPumpTimer = setTimeout(function () { epgPumpTimer = null; runEpg(); }, EPG_DWELL_MS);
+  }
+
+  function runEpg() {
+    if (App.client && App.client.epgBlocked && App.client.epgBlocked()) { epgQueue.length = 0; return; }
     while (epgRunning < EPG_PARALLEL && epgQueue.length && App.client) loadEpg(epgQueue.shift());
   }
 
@@ -420,7 +439,7 @@
       entry.at = Date.now();
       epgRunning--;
       refreshEpgViews(id);
-      pumpEpg();
+      if (!epgPumpTimer) runEpg();
     });
   }
 
@@ -485,8 +504,8 @@
     var header = itemsEl.querySelector('.guide-header');
     if (header) itemsEl.replaceChild(guideHeader(), header); // sposta l'etichetta dell'ora e, ogni mezz'ora, la fascia
     refreshEpgViews();
-    Array.prototype.forEach.call(itemsEl.children, function (rowEl) {
-      if (rowEl.item && rowEl.item.type === 'live') requestEpg(rowEl.item.id);
+    Array.prototype.forEach.call(itemsEl.children, function (rowEl, i) {
+      if (i <= EPG_VISIBLE && rowEl.item && rowEl.item.type === 'live') requestEpg(rowEl.item.id);
     });
   }, 60000);
 
@@ -539,7 +558,7 @@
     rowEl.item = item;
     rowEl.index = index;
     renderGuideRow(rowEl);
-    requestEpg(item.id);
+    if (index < EPG_VISIBLE) requestEpg(item.id);
     return rowEl;
   }
 

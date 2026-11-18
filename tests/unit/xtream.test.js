@@ -123,3 +123,34 @@ test('findAlternates trova gli altri feed dello stesso canale', function () {
   assert.deepStrictEqual(Xtream.findAlternates(items[0], items, 1).map(function (i) { return i.id; }), ['3']);
   assert.deepStrictEqual(Xtream.findAlternates(items[1], items), []);
 });
+
+test('guida: al primo 403 le richieste EPG si fermano e non vengono ripetute', async function () {
+  var calls = 0;
+  var client = new Xtream.Client({ server: 'x', username: 'u', password: 'p' }, function () {
+    calls++;
+    var err = new Error('403');
+    err.status = 403;
+    return Promise.reject(err);
+  });
+  await assert.rejects(client.getShortEpg(1, 2), /403/);
+  assert.strictEqual(client.epgBlocked(), true);
+  await assert.rejects(client.getShortEpg(2, 2), /Guida sospesa/);
+  assert.strictEqual(calls, 1, 'dopo il blocco non parte nessuna richiesta');
+});
+
+test('guida: le richieste EPG partono una alla volta e senza retry', async function () {
+  var running = 0;
+  var maxRunning = 0;
+  var noRetry = true;
+  var client = new Xtream.Client({ server: 'x', username: 'u', password: 'p' }, function (url, timeout, flag) {
+    noRetry = noRetry && flag === true;
+    running++;
+    maxRunning = Math.max(maxRunning, running);
+    return new Promise(function (resolve) {
+      setTimeout(function () { running--; resolve({ epg_listings: [] }); }, 5);
+    });
+  });
+  await Promise.all([client.getShortEpg(1, 2), client.getShortEpg(2, 2), client.getShortEpg(3, 2)]);
+  assert.strictEqual(maxRunning, 1);
+  assert.ok(noRetry);
+});

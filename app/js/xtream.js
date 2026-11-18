@@ -105,11 +105,11 @@
   var RETRY_DELAYS = [1500, 3000]; // un host del provider che è giù un attimo risponde spesso 404/502/503
 
   /** Richiesta GET JSON; se il server risponde 404 o 5xx la ripete un paio di volte prima di arrendersi. */
-  function xhrJson(url, timeout) {
+  function xhrJson(url, timeout, noRetry) {
     var attempt = 0;
     function run() {
       return xhrJsonOnce(url, timeout).then(null, function (err) {
-        if (!err.retryable || attempt >= RETRY_DELAYS.length) throw err;
+        if (noRetry || !err.retryable || attempt >= RETRY_DELAYS.length) throw err;
         var delay = RETRY_DELAYS[attempt++];
         return new Promise(function (resolve) { setTimeout(resolve, delay); }).then(run);
       });
@@ -173,6 +173,7 @@
     this.username = account.username;
     this.password = account.password;
     this.request = request || xhrJson;
+    this.epgGapMs = EPG_GAP_MS; // pausa tra due richieste di guida
   }
 
   XtreamClient.prototype.apiUrl = function (action, params) {
@@ -187,11 +188,41 @@
 
   // Come i player commerciali (IPTV Smarters), le chiamate pesanti partono una alla volta:
   // molti provider rifiutano (403/429) più richieste simultanee dallo stesso account.
+  // La guida (EPG) è opzionale e se ne chiedono a decine: una alla volta, con una pausa fra l'una e l'altra,
+  // senza ripetere gli errori e, al primo 403/429, si smette per un po' invece di insistere (rischio di ban).
   var EPG_ACTIONS = { get_short_epg: true, get_simple_data_table: true };
+  var EPG_GAP_MS = 300;
+  var EPG_BLOCK_MS = 150000;
+
+  /** True se il provider ha rifiutato la guida da poco: finché dura, le richieste EPG falliscono subito. */
+  XtreamClient.prototype.epgBlocked = function () {
+    return Date.now() < (this.epgBlockedUntil || 0);
+  };
+
+  XtreamClient.prototype.epgCall = function (url) {
+    var self = this;
+    var run = function () {
+      if (self.epgBlocked()) {
+        var blocked = new Error('Guida sospesa: il provider ha rifiutato le richieste');
+        blocked.status = 0;
+        blocked.blocked = true;
+        throw blocked;
+      }
+      return self.request(url, undefined, true).then(null, function (err) {
+        if (err && (err.status === 403 || err.status === 429)) self.epgBlockedUntil = Date.now() + EPG_BLOCK_MS;
+        throw err;
+      });
+    };
+    var result = (this.epgQueue || Promise.resolve()).then(run);
+    this.epgQueue = result.then(null, function () { /* l'errore va al chiamante */ }).then(function () {
+      return new Promise(function (resolve) { setTimeout(resolve, self.epgGapMs); });
+    });
+    return result;
+  };
 
   XtreamClient.prototype.call = function (action, params) {
     var url = this.apiUrl(action, params);
-    if (EPG_ACTIONS[action]) return this.request(url);
+    if (EPG_ACTIONS[action]) return this.epgCall(url);
     var self = this;
     var run = function () { return self.request(url); };
     var result = (this.queue || Promise.resolve()).then(run);

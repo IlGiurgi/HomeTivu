@@ -191,7 +191,7 @@ async function main() {
 
   await step('Le tue partite: ricerca nella guida, Preferiti, avviso e sensore di Home Assistant', async function () {
     // Con un canale in riproduzione la ricerca aspetta: prima si ferma quello aperto dalla prova dei feed.
-    await page.evaluate(function () { MiniPlayer.close(); Matches.gapMs = 0; });
+    await page.evaluate(function () { MiniPlayer.close(); Matches.gapMs = 0; App.client.epgGapMs = 0; });
     await page.evaluate(function () { Nav.focus(document.getElementById('follow-terms')); });
     await press('Enter');
     await page.keyboard.type('telegiornale');
