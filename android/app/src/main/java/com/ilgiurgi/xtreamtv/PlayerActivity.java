@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.Gravity;
@@ -31,6 +32,7 @@ import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.PlayerView;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import org.json.JSONArray;
@@ -58,7 +60,17 @@ public class PlayerActivity extends AppCompatActivity {
     static final String RESULT_ERROR = "error";
 
     private static final int MAX_LIVE_RETRIES = 3;
-    private static final long RETRY_DELAY_MS = 2000;
+    // Attese crescenti tra un tentativo e l'altro: riaprire subito lascia ancora aperta la connessione di prima
+    // e il provider (limite di 1-2 connessioni) risponde 403 o blocca l'IP.
+    private static final long[] RETRY_DELAYS_MS = {2000, 4000, 8000};
+    // Dopo un 403/429 si riprova una sola volta, e dopo una pausa lunga.
+    private static final long LIMIT_PAUSE_MS = 6000;
+    // Cambio canale: pausa dopo aver chiuso il flusso; scorrendo in fretta si apre solo l'ultimo canale scelto.
+    private static final long SWITCH_GAP_MS = 1500;
+    // Tetto di aperture di stream nella finestra (come OpenLimit nell'app TV): oltre, si aspetta.
+    private static final int OPEN_LIMIT = 6;
+    private static final long OPEN_WINDOW_MS = 30000;
+    private static final ArrayDeque<Long> recentOpens = new ArrayDeque<>();
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ExoPlayer player;
@@ -66,6 +78,7 @@ public class PlayerActivity extends AppCompatActivity {
     private TextView titleView;
     private boolean live;
     private int liveRetries;
+    private int lastHttpStatus;
     private String lastError;
     private GestureDetector swipeDetector;
     private List<MediaItem> allItems;
@@ -107,7 +120,10 @@ public class PlayerActivity extends AppCompatActivity {
 
             @Override
             public void onPlaybackStateChanged(int state) {
-                if (state == Player.STATE_READY) liveRetries = 0;
+                if (state == Player.STATE_READY) {
+                    liveRetries = 0;
+                    lastHttpStatus = 0;
+                }
                 if (state == Player.STATE_ENDED) {
                     if (live) retryLive();
                     else finishWithResult();
@@ -117,12 +133,15 @@ public class PlayerActivity extends AppCompatActivity {
             @Override
             public void onPlayerError(PlaybackException error) {
                 lastError = error.getErrorCodeName();
+                lastHttpStatus = 0;
                 // Se il provider ha risposto (403, 404, 884...), il codice HTTP dice più del nome generico dell'errore.
                 Throwable cause = error.getCause();
                 if (cause instanceof androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
-                    lastError += " HTTP " + ((androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) cause).responseCode;
+                    lastHttpStatus = ((androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) cause).responseCode;
+                    lastError += " HTTP " + lastHttpStatus;
                 }
-                if (live && liveRetries < MAX_LIVE_RETRIES) {
+                boolean limited = lastHttpStatus == 403 || lastHttpStatus == 429;
+                if (live && liveRetries < (limited ? 1 : MAX_LIVE_RETRIES)) {
                     // Le dirette IPTV cadono spesso per qualche secondo: si riprova da soli.
                     retryLive();
                 } else {
@@ -140,6 +159,7 @@ public class PlayerActivity extends AppCompatActivity {
         playerView.setControllerVisibilityListener(
                 (PlayerView.ControllerVisibilityListener) visibility -> titleView.setVisibility(visibility));
 
+        if (live) recentOpens.addLast(SystemClock.elapsedRealtime());
         if (live) player.setMediaItem(items.get(index));
         else player.setMediaItems(items, index, startMs);
         player.prepare();
@@ -160,13 +180,40 @@ public class PlayerActivity extends AppCompatActivity {
 
     /** Riapre lo stesso canale dopo una pausa (errore o chiusura da parte del server). */
     private void retryLive() {
+        boolean limited = lastHttpStatus == 403 || lastHttpStatus == 429;
+        long delay = limited ? LIMIT_PAUSE_MS : RETRY_DELAYS_MS[Math.min(liveRetries, RETRY_DELAYS_MS.length - 1)];
         liveRetries++;
-        handler.postDelayed(() -> {
-            if (player == null) return;
+        if (player != null) player.stop(); // la connessione si chiude prima di aspettare
+        scheduleOpen(delay, () -> {
             player.seekToDefaultPosition();
             player.prepare();
             player.setPlayWhenReady(true);
-        }, RETRY_DELAY_MS);
+        });
+    }
+
+    /** Millisecondi da aspettare prima di poter aprire un altro stream senza superare il tetto (0 = subito). */
+    private static long openLimitWait() {
+        long now = SystemClock.elapsedRealtime();
+        while (!recentOpens.isEmpty() && now - recentOpens.peekFirst() >= OPEN_WINDOW_MS) recentOpens.pollFirst();
+        return recentOpens.size() < OPEN_LIMIT ? 0 : recentOpens.peekFirst() + OPEN_WINDOW_MS - now;
+    }
+
+    /**
+     * Apre uno stream dopo `delayMs` (o più tardi, se si supera il tetto di aperture). Una nuova richiesta annulla
+     * quella in attesa: con lo zapping veloce parte solo l'ultima.
+     */
+    private void scheduleOpen(long delayMs, Runnable open) {
+        handler.removeCallbacksAndMessages(null);
+        handler.postDelayed(() -> {
+            if (player == null) return;
+            long wait = openLimitWait();
+            if (wait > 0) {
+                scheduleOpen(wait, open);
+                return;
+            }
+            recentOpens.addLast(SystemClock.elapsedRealtime());
+            open.run();
+        }, delayMs);
     }
 
     /** Pulsanti precedente/successivo del lettore = canale vicino nella lista (che ExoPlayer non conosce). */
@@ -247,10 +294,15 @@ public class PlayerActivity extends AppCompatActivity {
         int count = allItems.size();
         liveIndex = (liveIndex + delta + count) % count;
         liveRetries = 0;
-        handler.removeCallbacksAndMessages(null);
-        player.setMediaItem(allItems.get(liveIndex));
-        player.prepare();
-        player.setPlayWhenReady(true);
+        lastHttpStatus = 0;
+        player.stop(); // chiude il flusso attuale; il nuovo si apre dopo la pausa (SWITCH_GAP_MS)
+        final MediaItem next = allItems.get(liveIndex);
+        titleView.setText(next.mediaMetadata.title == null ? "" : next.mediaMetadata.title);
+        scheduleOpen(SWITCH_GAP_MS, () -> {
+            player.setMediaItem(next);
+            player.prepare();
+            player.setPlayWhenReady(true);
+        });
         playerView.showController();
     }
 
