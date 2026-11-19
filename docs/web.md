@@ -1,24 +1,23 @@
-# Versione web (browser sul PC)
+# Web version (browser on the PC)
 
-La stessa app è pubblicata su GitHub Pages: **https://ilgiurgi.github.io/App-tv/**
+The same app is published on GitHub Pages: **https://ilgiurgi.github.io/App-tv/**
 
-- Accedi con gli stessi dati della TV. Le credenziali restano **solo nel tuo browser** (localStorage):
-  la pagina pubblica non contiene dati personali.
-- Si usa con il mouse (clic, rotellina, pulsante "← Indietro"; doppio clic sul video = schermo intero)
-  oppure con la tastiera (frecce, Invio, Esc).
-- I canali MPEG-TS sono riprodotti con [mpegts.js](https://github.com/xqq/mpegts.js), quelli HLS con
-  [hls.js](https://github.com/video-dev/hls.js): vengono scaricati dal CDN jsDelivr solo nel browser, mai sulla TV.
+- Sign in with the same details as on the TV. Credentials stay **only in your browser** (localStorage):
+  the public page contains no personal data.
+- Use it with the mouse (click, wheel, "← Indietro" (Back) button; double-click on the video = full screen)
+  or with the keyboard (arrows, Enter, Esc).
+- MPEG-TS channels are played with [mpegts.js](https://github.com/xqq/mpegts.js), HLS ones with
+  [hls.js](https://github.com/video-dev/hls.js): they are downloaded from the jsDelivr CDN only in the browser, never on the TV.
 
-Limiti del browser, che sulla TV non esistono:
+Browser limitations that do not exist on the TV:
 
-- il server IPTV deve permettere richieste da altri siti (**CORS**). Se compare l'errore
-  "il server blocca le richieste dal browser", il provider non lo consente: usa l'app sulla TV;
-- una pagina https non può caricare contenuti http: se il server o i flussi video sono `http://`, il browser li blocca;
-- alcuni film in MKV o con audio AC3/EAC3 non sono riproducibili da Chrome;
-- se un canale non parte prova *Impostazioni → Formato canali live → HLS*;
-- PC e TV insieme contano come due connessioni sull'abbonamento.
+- the IPTV server must allow requests from other sites (**CORS**). If you see the error
+  "il server blocca le richieste dal browser" (the server blocks requests from the browser), the provider does not allow it: use the app on the TV;
+- an https page cannot load http content: if the server or the video streams are `http://`, the browser blocks them;
+- some MKV movies or ones with AC3/EAC3 audio cannot be played by Chrome;
+- if a channel does not start try *Impostazioni → Formato canali live → HLS* (Settings → Live channel format → HLS);
+- PC and TV together count as two connections on your subscription.
 
-**Pubblicazione**: il workflow `.github/workflows/ci-pages.yml` esegue lint e test a ogni push e, sul branch
-predefinito, pubblica la cartella `app/`. La prima volta va attivato GitHub Pages:
+**Publishing**: the `.github/workflows/ci-pages.yml` workflow runs lint and tests on every push and, on the
+default branch, publishes the `app/` folder. The first time, GitHub Pages must be enabled:
 *Settings → Pages → Build and deployment → Source: **GitHub Actions***.
-

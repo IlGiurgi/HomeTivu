@@ -1,36 +1,36 @@
-# App Android (telefono)
+# Android app (phone)
 
-L'app per Android funziona ovunque, anche fuori casa: le richieste al server partono dall'app
-(niente blocco CORS) e il video usa il lettore nativo **ExoPlayer** (MPEG-TS, HLS, MP4, MKV).
+The Android app works anywhere, even away from home: requests to the server are made by the app itself
+(no CORS blocking) and video uses the native **ExoPlayer** (MPEG-TS, HLS, MP4, MKV).
 
-**Installazione**
+**Installation**
 
-1. Dal telefono apri **https://github.com/IlGiurgi/App-tv/releases/tag/android-latest**
-   e scarica **HomeTivu.apk**.
-2. Aprilo dalle notifiche o da *Download*. Android chiederà di consentire l'installazione
-   da questa fonte (browser o file manager): consenti e installa.
-3. Avvia **HomeTivu** e accedi con server, utente e password.
+1. On the phone open **https://github.com/IlGiurgi/App-tv/releases/tag/android-latest**
+   and download **HomeTivu.apk**.
+2. Open it from the notifications or from *Downloads*. Android will ask you to allow installation
+   from this source (browser or file manager): allow it and install.
+3. Start **HomeTivu** and sign in with server, username and password.
 
-Gli aggiornamenti si installano sopra la versione precedente, senza perdere preferiti e accesso.
+Updates install over the previous version, without losing favorites or login.
 
-**Server con certificato non valido**: se "Impossibile contattare il server" e, aprendo
-`https://server:porta/player_api.php` nel browser del telefono, compare "la connessione non è sicura",
-il provider usa un certificato non valido. Al login spunta **"Accetta il certificato non valido di questo
-server"**: l'eccezione vale solo per quel server (gli altri siti restano verificati), viene rimossa al
-logout o se il login fallisce, ed è indicata in *Impostazioni*. Su reti non fidate (Wi-Fi pubblici) i dati
-dell'abbonamento sono meno protetti. Sulla TV Samsung questa eccezione non è possibile.
+**Server with an invalid certificate**: if you get "Impossibile contattare il server" (cannot reach the server) and,
+when opening `https://server:port/player_api.php` in the phone's browser, it says "the connection is not secure",
+the provider uses an invalid certificate. At login tick **"Accetta il certificato non valido di questo
+server"** (Accept this server's invalid certificate): the exception applies only to that server (other sites stay
+verified), is removed on logout or if the login fails, and is shown in *Impostazioni* (Settings). On untrusted networks
+(public Wi-Fi) your subscription data is less protected. On the Samsung TV this exception is not possible.
 
-**Uso**: tocca per aprire, scorri col dito; **tieni premuto** un canale, film o serie per aggiungerlo o
-toglierlo dai preferiti; **scorri a destra o sinistra** sulla lista per passare alla categoria successiva o
-precedente (le sezioni Live TV, Film, Serie… si scelgono toccando i tab in alto); nel lettore a schermo
-intero ci sono i comandi (pausa, avanti/indietro, canale o episodio precedente/successivo) e, se lo attivi
-in *Impostazioni*, sui canali live **scorrendo a sinistra o destra sul video** si cambia canale. Il tasto Indietro di Android
-risale nell'app; premuto due volte nella schermata principale chiude l'app.
+**Usage**: tap to open, scroll with your finger; **long-press** a channel, movie or series to add it to or
+remove it from favorites; **swipe right or left** on the list to move to the next or previous category
+(the Live TV, Movies, Series… sections are chosen by tapping the tabs at the top); the full-screen player
+has controls (pause, forward/back, previous/next channel or episode) and, if you enable it in
+*Impostazioni*, on live channels **swiping left or right on the video** changes channel. Android's Back button
+goes up inside the app; pressed twice on the main screen it closes the app.
 
-**Come viene creato**: [Capacitor](https://capacitorjs.com) impacchetta la cartella `app/` nel progetto
-`android/`; il plugin `NativePlayer` (`android/app/src/main/java/.../PlayerActivity.java`) apre ExoPlayer.
-GitHub Actions compila l'APK a ogni push e lo pubblica nella release `android-latest`.
-Per compilarlo in locale servono Android Studio (o l'SDK Android) e Java 21:
+**How it is built**: [Capacitor](https://capacitorjs.com) packages the `app/` folder into the `android/`
+project; the `NativePlayer` plugin (`android/app/src/main/java/.../PlayerActivity.java`) opens ExoPlayer.
+GitHub Actions builds the APK on every push and publishes it in the `android-latest` release.
+To build it locally you need Android Studio (or the Android SDK) and Java 21:
 
 ```bash
 npm ci
@@ -38,7 +38,6 @@ npx cap sync android
 cd android && ./gradlew assembleRelease   # -> app/build/outputs/apk/release/app-release.apk
 ```
 
-L'APK è firmato con una chiave inclusa nel repository (`android/app/xtreamtv.keystore`), così gli
-aggiornamenti si installano sopra la versione precedente. Va bene per un'app personale installata a mano,
-non per pubblicarla sul Play Store.
-
+The APK is signed with a key included in the repository (`android/app/xtreamtv.keystore`), so updates
+install over the previous version. This is fine for a personal app installed by hand,
+not for publishing on the Play Store.

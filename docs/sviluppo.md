@@ -1,41 +1,40 @@
-# Sviluppo
+# Development
 
-Non serve alcun build: è HTML/CSS/JavaScript puro, scritto in ES2015 compatibile con Chromium 47 (Tizen 3.0).
-
-```bash
-npm install          # solo per lint e test (eslint, playwright)
-npm run dev          # server di sviluppo con un finto server Xtream
-```
-
-Apri <http://localhost:8080> e accedi con server `http://localhost:8080`, utente `demo`, password `demo`.
-Nel browser si naviga con la tastiera: frecce, Invio = OK, Esc/Backspace = INDIETRO, F1 = ROSSO, F3 = GIALLO, F4 = BLU, PagSu/PagGiù = CH+/CH−.
-I flussi video finti non sono riproducibili nel browser: la riproduzione vera va provata sulla TV.
+No build is needed: it is plain HTML/CSS/JavaScript, written in ES2015 compatible with Chromium 47 (Tizen 3.0).
 
 ```bash
-npm run lint         # controlla anche l'uso di sintassi non supportata dalle TV più vecchie
-npm test             # test unitari (client Xtream, storage)
-npm run test:e2e     # test end-to-end in Chromium: telecomando, AVPlay simulato, mouse, player web, app Android simulata
-node dev/icon/render.js  # rigenera icone (TV e Android) e splash da dev/icon/hometivu.svg
+npm install          # only for lint and tests (eslint, playwright)
+npm run dev          # dev server with a fake Xtream server
 ```
 
-### Struttura
+Open <http://localhost:8080> and sign in with server `http://localhost:8080`, username `demo`, password `demo`.
+In the browser you navigate with the keyboard: arrows, Enter = OK, Esc/Backspace = BACK, F1 = RED, F3 = YELLOW, F4 = BLUE, PageUp/PageDown = CH+/CH−.
+The fake video streams cannot be played in the browser: real playback has to be tested on the TV.
+
+```bash
+npm run lint         # also checks for syntax not supported by older TVs
+npm test             # unit tests (Xtream client, storage)
+npm run test:e2e     # end-to-end tests in Chromium: remote, simulated AVPlay, mouse, web player, simulated Android app
+node dev/icon/render.js  # regenerates icons (TV and Android) and splash from dev/icon/hometivu.svg
+```
+
+### Structure
 
 ```
-app/                      progetto Tizen (è la cartella da importare/pacchettizzare)
-  config.xml              manifest Tizen (id app, permessi, profilo tv-samsung)
+app/                      Tizen project (this is the folder to import/package)
+  config.xml              Tizen manifest (app id, privileges, tv-samsung profile)
   index.html
-  css/style.css           layout 1920x1080
-  js/xtream.js            client API Xtream Codes (player_api.php)
-  js/storage.js           account, preferiti, posizioni di ripresa (localStorage)
-  js/keys.js              tasti del telecomando
-  js/nav.js               navigazione spaziale con le frecce
-  js/player.js            AVPlay sulla TV, <video> nel browser
-  js/app.js               pila delle schermate, sessione, cache
-  js/platform.js          TV / app Android / browser
-  js/pointer.js           supporto mouse e touch
-  js/screens/*.js         login, home, dettaglio, player
-android/                  progetto Android (Capacitor) con il lettore nativo ExoPlayer
-dev/mock-server.js        finto server Xtream + server statico per lo sviluppo
-tests/                    test unitari ed end-to-end
+  css/style.css           1920x1080 layout
+  js/xtream.js            Xtream Codes API client (player_api.php)
+  js/storage.js           account, favorites, resume positions (localStorage)
+  js/keys.js              remote control keys
+  js/nav.js               spatial navigation with the arrow keys
+  js/player.js            AVPlay on the TV, <video> in the browser
+  js/app.js               screen stack, session, cache
+  js/platform.js          TV / Android app / browser
+  js/pointer.js           mouse and touch support
+  js/screens/*.js         login, home, detail, player
+android/                  Android project (Capacitor) with the native ExoPlayer player
+dev/mock-server.js        fake Xtream server + static server for development
+tests/                    unit and end-to-end tests
 ```
-

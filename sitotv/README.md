@@ -1,20 +1,19 @@
-# SitoTV — un sito web a schermo intero
+# SitoTV — a full-screen website
 
+The `sitotv/` folder contains a second app, separate from HomeTivu (id `SitoTVview.SitoTV`), that opens
+a website of your choice full screen.
 
-Nella cartella `sitotv/` c'è una seconda app, separata da HomeTivu (id `SitoTVview.SitoTV`), che apre
-a schermo intero un sito scelto da te.
+- On first launch type the address (OK on the field opens the keyboard, OK again to open the site).
+- On later launches the site opens by itself after 4 seconds; during that time OK or RED
+  lets you change the address.
+- The site fills the whole app window, so arrows, OK and BACK go straight to the page.
+  How they behave depends on the site. EXIT or HOME always close the app.
 
-- Al primo avvio scrivi l'indirizzo (OK sul campo apre la tastiera, OK di nuovo per aprire il sito).
-- Agli avvii successivi il sito si apre da solo dopo 4 secondi; in quel momento OK o ROSSO
-  permettono di cambiare indirizzo.
-- Il sito occupa tutta la finestra dell'app, quindi frecce, OK e INDIETRO arrivano direttamente alla pagina.
-  Come si comportano dipende dal sito. EXIT o HOME chiudono sempre l'app.
-
-Si installa come HomeTivu, partendo dalla cartella `sitotv`:
+It is installed like HomeTivu, starting from the `sitotv` folder:
 
 ```bash
 cd sitotv
 tizen package -t wgt -s TiptOld
-tizen install -n SitoTV.wgt -t <nome-dispositivo>
-tizen run -p SitoTVview.SitoTV -t <nome-dispositivo>
+tizen install -n SitoTV.wgt -t <device-name>
+tizen run -p SitoTVview.SitoTV -t <device-name>
 ```
