@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/IlGiurgi/App-tv/actions/workflows/ci-pages.yml"><img src="https://github.com/IlGiurgi/App-tv/actions/workflows/ci-pages.yml/badge.svg" alt="Build"></a>
+  <a href="https://github.com/IlGiurgi/HomeTivu/actions/workflows/ci-pages.yml"><img src="https://github.com/IlGiurgi/HomeTivu/actions/workflows/ci-pages.yml/badge.svg" alt="Build"></a>
   <img src="https://img.shields.io/badge/Samsung%20Tizen-3.0%2B-1428A0?logo=samsung&logoColor=white" alt="Tizen 3.0+">
   <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=white" alt="Android">
-  <a href="https://github.com/IlGiurgi/App-tv/releases"><img src="https://img.shields.io/github/v/release/IlGiurgi/App-tv?include_prereleases&label=release" alt="Release"></a>
+  <a href="https://github.com/IlGiurgi/HomeTivu/releases"><img src="https://img.shields.io/github/v/release/IlGiurgi/HomeTivu?include_prereleases&label=release" alt="Release"></a>
 </p>
 
 > 🇮🇹 The app's interface is in Italian. This documentation is in English; menu and screen names are
@@ -46,8 +46,8 @@ One codebase, three versions: the same app runs on the **Samsung TV** (native AV
 | Platform | What you need | Guide |
 |---|---|---|
 | **Samsung TV** (Tizen 3.0+, 2017 onwards) | A PC with Tizen Studio and a TV in developer mode | [docs/tv.md](docs/tv.md) |
-| **Android** | Download the APK from the [`android-latest` release](https://github.com/IlGiurgi/App-tv/releases/tag/android-latest) | [docs/android.md](docs/android.md) |
-| **Browser** | Nothing to install: <https://ilgiurgi.github.io/App-tv/> | [docs/web.md](docs/web.md) |
+| **Android** | Download the APK from the [`android-latest` release](https://github.com/IlGiurgi/HomeTivu/releases/tag/android-latest) | [docs/android.md](docs/android.md) |
+| **Browser** | Nothing to install: <https://ilgiurgi.github.io/HomeTivu/> | [docs/web.md](docs/web.md) |
 
 Once the TV and the certificate are set up (one time only), every update on the TV is a single command:
 
@@ -98,7 +98,7 @@ Details, folder structure and the Android build are in [docs/sviluppo.md](docs/s
 A second, separate app: [SitoTV](sitotv/README.md), a full-screen website on the TV.
 
 ## Contributing
-Reports and ideas are welcome in [Issues](https://github.com/IlGiurgi/App-tv/issues): please include the TV or phone
+Reports and ideas are welcome in [Issues](https://github.com/IlGiurgi/HomeTivu/issues): please include the TV or phone
 model and what happened.
 
 ## Notes

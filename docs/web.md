@@ -1,6 +1,6 @@
 # Web version (browser on the PC)
 
-The same app is published on GitHub Pages: **https://ilgiurgi.github.io/App-tv/**
+The same app is published on GitHub Pages: **https://ilgiurgi.github.io/HomeTivu/**
 
 - Sign in with the same details as on the TV. Credentials stay **only in your browser** (localStorage):
   the public page contains no personal data.

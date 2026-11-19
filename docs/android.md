@@ -5,7 +5,7 @@ The Android app works anywhere, even away from home: requests to the server are 
 
 **Installation**
 
-1. On the phone open **https://github.com/IlGiurgi/App-tv/releases/tag/android-latest**
+1. On the phone open **https://github.com/IlGiurgi/HomeTivu/releases/tag/android-latest**
    and download **HomeTivu.apk**.
 2. Open it from the notifications or from *Downloads*. Android will ask you to allow installation
    from this source (browser or file manager): allow it and install.
