@@ -77,16 +77,38 @@
       }
       return favIndex[favKey(type, id)] === true;
     },
-    /** Aggiunge o rimuove; restituisce true se ora è tra i preferiti. */
+    /**
+     * Aggiunge o rimuove; restituisce true se ora è tra i preferiti.
+     * Ogni modifica porta l'ora (`at` sul preferito, `favGone` per i tolti): servono a unire le liste di telefono e TV.
+     */
     toggleFavorite: function (item) {
       var key = favKey(item.type, item.id);
       var favorites = this.getFavorites();
       var filtered = favorites.filter(function (f) { return favKey(f.type, f.id) !== key; });
       var added = filtered.length === favorites.length;
-      if (added) filtered.push(item);
+      var gone = read('favGone', {});
+      if (added) {
+        var stamped = {};
+        Object.keys(item).forEach(function (k) { stamped[k] = item[k]; });
+        stamped.at = Date.now();
+        filtered.push(stamped);
+        delete gone[key];
+      } else {
+        gone[key] = Date.now();
+      }
       write('favorites', filtered);
+      write('favGone', gone);
       favIndex = null;
+      if (Storage.onFavoritesChange) Storage.onFavoritesChange();
       return added;
+    },
+    /** Preferiti tolti di recente: {"tipo:id": ora della rimozione}, per propagare le rimozioni all'altro dispositivo. */
+    getFavoritesGone: function () { return read('favGone', {}); },
+    /** Sostituisce l'elenco con quello unito dalla sincronizzazione (non riparte la sincronizzazione). */
+    replaceFavorites: function (items, gone) {
+      write('favorites', items);
+      write('favGone', gone);
+      favIndex = null;
     },
 
     /** Posizioni di ripresa per film ed episodi, in secondi. */

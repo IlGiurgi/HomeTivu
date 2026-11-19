@@ -138,6 +138,10 @@ function handle(req, res, parsed, pathname) {
   }
   // Stati scritti dall'app (sensore "cosa sto guardando", js/watching.js): non entrano in /api/states.
   var written = pathname.match(/^\/api\/states\/([\w.]+)$/);
+  if (written && req.method === 'GET') {
+    var saved = posted[written[1]];
+    return saved ? json(res, 200, { entity_id: written[1], state: saved.state, attributes: saved.attributes || {} }) : json(res, 404, { message: 'Entity not found.' });
+  }
   if (written && req.method === 'POST') {
     var stateBody = '';
     req.on('data', function (chunk) { stateBody += chunk; });

@@ -192,7 +192,7 @@ async function main() {
       var req = route.request();
       var headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
       if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: headers });
-      if (req.method() === 'POST') posted.push([req.url(), req.postData()]);
+      if (req.method() === 'POST' && /\/api\/events\//.test(req.url())) posted.push([req.url(), req.postData()]); // la sincronizzazione dei preferiti scrive altrove
       var body = /\/api\/states$/.test(req.url())
         ? [{ entity_id: 'sensor.hometivu_tv_a', state: 'Rai 1', attributes: { friendly_name: 'HomeTivu Samsung denis', aggiornato: new Date().toISOString() } }]
         : /sensor\.hometivu_tv_a/.test(req.url()) ? { entity_id: 'sensor.hometivu_tv_a', state: 'Rai 1', attributes: {} } : {};

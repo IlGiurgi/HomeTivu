@@ -332,6 +332,7 @@
       return;
     }
     UI.withLoader(App.login(account)).then(function () {
+      if (root.FavSync) root.FavSync.start();
       App.openHome();
     }, function (err) {
       App.show('login', { account: account, error: err.message });
