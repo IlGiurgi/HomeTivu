@@ -26,3 +26,17 @@ test('il registro tiene al massimo 200 righe, le ultime, in ordine di tempo', fu
   assert.match(lines[1], / riga 249$/);
   Netlog.clear();
 });
+
+test('firstRefusal conserva la prima richiesta rifiutata dell\'episodio e resta dopo il primo 200 finché non ne arriva uno nuovo', function () {
+  Netlog.clear();
+  assert.strictEqual(Netlog.firstRefusal(), '');
+  Netlog.add('apertura stream 1', 1000);
+  Netlog.add('api get_short_epg stream_id=5 -> 404', 2000);
+  Netlog.add('api get_short_epg stream_id=6 -> 404', 3000);
+  assert.match(Netlog.firstRefusal(), /stream_id=5 -> 404.*prima: apertura stream 1$/);
+  Netlog.add('api get_live_streams -> 200', 4000);
+  assert.match(Netlog.firstRefusal(), /stream_id=5 -> 404/, 'il dato serve proprio dopo che il blocco è finito');
+  Netlog.add('video risposta del server: HTTP 403', 5000);
+  assert.match(Netlog.firstRefusal(), /HTTP 403/, 'un nuovo episodio sostituisce il precedente');
+  Netlog.clear();
+});

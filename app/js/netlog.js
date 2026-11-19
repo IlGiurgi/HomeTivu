@@ -12,6 +12,9 @@
   var entries = [];
   var saveTimer = null;
   var pushTimer = null;
+  var first = null; // prima richiesta rifiutata dell'ultimo episodio: resta anche dopo che il blocco è finito
+  var episodeOpen = false; // true finché dopo un rifiuto non arriva un 200: il rifiuto successivo apre un nuovo episodio
+  var REFUSED = /(->|HTTP) (403|404|429)\b/;
 
   try {
     var saved = JSON.parse(root.localStorage.getItem(KEY) || '[]');
@@ -53,6 +56,12 @@
     add: function (text, at) {
       entries.push({ at: at || Date.now(), text: String(text).slice(0, 120) });
       if (entries.length > MAX) entries.shift();
+      if (REFUSED.test(text)) {
+        if (!episodeOpen) first = { at: entries[entries.length - 1].at, text: String(text).slice(0, 120), before: entries.length > 1 ? entries[entries.length - 2].text : '' };
+        episodeOpen = true;
+      } else if (/-> 200\b/.test(text)) {
+        episodeOpen = false;
+      }
       persist();
       // Un rifiuto del provider va subito a Home Assistant (una volta ogni 20 s al massimo): è il momento che interessa.
       if (!pushTimer && /\b(403|429)\b|sospesa/.test(text) && root.Watching && root.Watching.touch) {
@@ -69,9 +78,14 @@
       return entries.slice(-(count || MAX)).map(function (e) { return clock(e.at) + ' ' + e.text; });
     },
 
+    /** Prima richiesta rifiutata (403/404/429) dell'ultimo episodio, con orario, e la riga subito prima; resta finché non ne arriva uno nuovo. */
+    firstRefusal: function () {
+      return first ? clock(first.at) + ' ' + first.text + (first.before ? '  | prima: ' + first.before : '') : '';
+    },
+
     entries: function (count) { return entries.slice(-(count || MAX)); },
 
-    clear: function () { entries = []; persist(); }
+    clear: function () { entries = []; first = null; episodeOpen = false; persist(); }
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Netlog;

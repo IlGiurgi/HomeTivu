@@ -383,7 +383,7 @@
   // poche richieste alla volta per non rallentare la TV, e resta in memoria per qualche minuto.
   var EPG_TTL = 5 * 60000;
   var EPG_PARALLEL = 1;
-  var EPG_VISIBLE = 12; // righe per cui la guida si chiede subito; le altre quando ci si arriva con il focus
+  var EPG_VISIBLE = 8; // righe per cui la guida si chiede subito; le altre quando ci si arriva con il focus
   var EPG_AHEAD = 8; // righe davanti a quella selezionata
   var EPG_DWELL_MS = 600; // dopo un cambio categoria si aspetta un attimo: scorrendo in fretta non parte niente
   var epgPumpTimer = null;

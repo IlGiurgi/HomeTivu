@@ -154,3 +154,29 @@ test('guida: le richieste EPG partono una alla volta e senza retry', async funct
   assert.strictEqual(maxRunning, 1);
   assert.ok(noRetry);
 });
+
+test('guida: tre 404 di fila sospendono la richiesta, un 200 azzera il conteggio', async function () {
+  var calls = 0;
+  var fail = true;
+  var client = new Xtream.Client({ server: 'x', username: 'u', password: 'p' }, function () {
+    calls++;
+    if (!fail) return Promise.resolve({ epg_listings: [] });
+    var err = new Error('404');
+    err.status = 404;
+    return Promise.reject(err);
+  });
+  client.epgGapMs = 0;
+  await assert.rejects(client.getShortEpg(1, 2), /404/);
+  await assert.rejects(client.getShortEpg(2, 2), /404/);
+  assert.strictEqual(client.epgBlocked(), false, 'due 404 non bastano: un canale può non avere la guida');
+  fail = false;
+  await client.getShortEpg(3, 2);
+  fail = true;
+  await assert.rejects(client.getShortEpg(4, 2), /404/);
+  await assert.rejects(client.getShortEpg(5, 2), /404/);
+  assert.strictEqual(client.epgBlocked(), false, 'il 200 ha azzerato il conteggio');
+  await assert.rejects(client.getShortEpg(6, 2), /404/);
+  assert.strictEqual(client.epgBlocked(), true);
+  await assert.rejects(client.getShortEpg(7, 2), /Guida sospesa/);
+  assert.strictEqual(calls, 6);
+});

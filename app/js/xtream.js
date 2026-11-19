@@ -196,7 +196,8 @@
   // La guida (EPG) è opzionale e se ne chiedono a decine: una alla volta, con una pausa fra l'una e l'altra,
   // senza ripetere gli errori e, al primo 403/429, si smette per un po' invece di insistere (rischio di ban).
   var EPG_ACTIONS = { get_short_epg: true, get_simple_data_table: true };
-  var EPG_GAP_MS = 300;
+  var EPG_GAP_MS = 600;
+  var EPG_REFUSALS = 3; // rifiuti di fila (404 compreso) dopo i quali la guida si sospende
   var EPG_BLOCK_MS = 150000;
 
   /** True se il provider ha rifiutato la guida da poco: finché dura, le richieste EPG falliscono subito. */
@@ -213,9 +214,16 @@
         blocked.blocked = true;
         throw blocked;
       }
-      return self.request(url, undefined, true).then(null, function (err) {
-        if (err && (err.status === 403 || err.status === 429)) {
+      return self.request(url, undefined, true).then(function (data) {
+        self.epgRefusals = 0;
+        return data;
+      }, function (err) {
+        var refused = err && (err.status === 403 || err.status === 429 || err.status === 404);
+        self.epgRefusals = refused ? (self.epgRefusals || 0) + 1 : 0;
+        // 403/429: subito. 404: il provider rifiuta anche la guida, ma a volte un solo canale non ce l'ha: dopo 3 di fila.
+        if (err && (err.status === 403 || err.status === 429 || self.epgRefusals >= EPG_REFUSALS)) {
           self.epgBlockedUntil = Date.now() + EPG_BLOCK_MS;
+          self.epgRefusals = 0;
           if (typeof Netlog !== 'undefined') Netlog.add('guida sospesa per ' + EPG_BLOCK_MS / 1000 + ' s dopo HTTP ' + err.status);
         }
         throw err;
