@@ -282,10 +282,24 @@
     });
   };
 
-  /** EPG breve: [{title, description, start, end}] con testi già decodificati e orari in ms. */
+  var EPG_CACHE_MS = 5 * 60000;
+
+  /**
+   * EPG breve: [{title, description, start, end}] con testi già decodificati e orari in ms.
+   * Una sola memoria per tutto il client (lista, lettore, Home, partite): la stessa guida non si chiede due volte
+   * in 5 minuti, né mentre un'altra richiesta uguale è in corso; si rifà prima se il programma in onda è finito.
+   */
   XtreamClient.prototype.getShortEpg = function (streamId, limit) {
-    return this.call('get_short_epg', { stream_id: streamId, limit: limit || 2 }).then(function (data) {
-      return asArray(data && data.epg_listings).map(function (item) {
+    limit = limit || 2;
+    var cache = this.epgCache = this.epgCache || {};
+    var entry = cache[streamId];
+    var now = Date.now();
+    if (entry && entry.limit >= limit && (entry.loading || (now - entry.at < EPG_CACHE_MS && (!entry.list.length || entry.list.some(function (p) { return p.start <= now && p.end > now; }))))) {
+      return entry.promise.then(function (list) { return list.slice(0, limit); });
+    }
+    entry = cache[streamId] = { limit: limit, at: now, loading: true, list: [] };
+    entry.promise = this.call('get_short_epg', { stream_id: streamId, limit: limit }).then(function (data) {
+      var list = asArray(data && data.epg_listings).map(function (item) {
         return {
           title: decodeBase64(item.title),
           description: decodeBase64(item.description),
@@ -293,7 +307,15 @@
           end: Number(item.stop_timestamp) * 1000
         };
       });
+      entry.list = list;
+      entry.at = Date.now();
+      entry.loading = false;
+      return list;
+    }, function (err) {
+      if (cache[streamId] === entry) delete cache[streamId]; // gli errori non si ricordano: ci pensa il freno della guida
+      throw err;
     });
+    return entry.promise;
   };
 
   XtreamClient.prototype.liveUrl = function (streamId, format) {

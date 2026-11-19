@@ -141,7 +141,8 @@ public class PlayerActivity extends AppCompatActivity {
                     lastError += " HTTP " + lastHttpStatus;
                 }
                 boolean limited = lastHttpStatus == 403 || lastHttpStatus == 429;
-                if (live && liveRetries < (limited ? 1 : MAX_LIVE_RETRIES)) {
+                // 403/429 e 404 non passano da soli: un solo nuovo tentativo, poi ci si ferma.
+                if (live && liveRetries < (limited || lastHttpStatus == 404 ? 1 : MAX_LIVE_RETRIES)) {
                     // Le dirette IPTV cadono spesso per qualche secondo: si riprova da soli.
                     retryLive();
                 } else {

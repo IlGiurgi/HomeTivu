@@ -180,3 +180,29 @@ test('guida: tre 404 di fila sospendono la richiesta, un 200 azzera il conteggio
   await assert.rejects(client.getShortEpg(7, 2), /Guida sospesa/);
   assert.strictEqual(calls, 6);
 });
+
+test('getShortEpg: stessa guida non richiesta due volte (anche in contemporanea), errori non ricordati', async function () {
+  var calls = 0;
+  var now = Math.floor(Date.now() / 1000);
+  var failNext = false;
+  var client = new Xtream.Client({ server: 'x', username: 'u', password: 'p' }, function () {
+    calls++;
+    if (failNext) { failNext = false; var e = new Error('500'); e.status = 500; return Promise.reject(e); }
+    return Promise.resolve({ epg_listings: [
+      { title: 'QQ==', description: 'QQ==', start_timestamp: now - 600, stop_timestamp: now + 600 },
+      { title: 'Qg==', description: 'Qg==', start_timestamp: now + 600, stop_timestamp: now + 1200 }
+    ] });
+  });
+  client.epgGapMs = 0;
+  var both = await Promise.all([client.getShortEpg(7, 2), client.getShortEpg(7, 2)]);
+  assert.strictEqual(calls, 1, 'due richieste uguali in contemporanea: una sola chiamata');
+  assert.strictEqual(both[1].length, 2);
+  assert.strictEqual((await client.getShortEpg(7, 1)).length, 1, 'meno programmi: si risponde dalla memoria');
+  assert.strictEqual(calls, 1);
+  await client.getShortEpg(7, 5);
+  assert.strictEqual(calls, 2, 'più programmi di quelli in memoria: si richiede');
+  failNext = true;
+  await assert.rejects(client.getShortEpg(8, 2));
+  await client.getShortEpg(8, 2);
+  assert.strictEqual(calls, 4, 'l\'errore non resta in memoria');
+});
