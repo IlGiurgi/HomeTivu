@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /*
- * Test E2E del riordino dei preferiti: TV (GIALLO + frecce) e telefono (pulsante Riordina con ▲ ▼).
+ * Test E2E dei preferiti: TV (GIALLO + frecce per riordinare) e telefono (stella sempre visibile, pressione lunga e trascinamento).
  *
  *   node tests/e2e/reorder.js
  */
 'use strict';
+
+/* global Touch, TouchEvent */
 
 var assert = require('assert');
 var chromium = require('playwright').chromium;
@@ -78,17 +80,36 @@ async function main() {
   await mobile.addInitScript(installPhone, config);
   await mobile.goto(base);
   await mobile.waitForSelector('.items .row');
-  assert.strictEqual(await mobile.locator('.reorder-top').isVisible(), true, 'pulsante Riordina visibile nei preferiti');
-  assert.strictEqual(await mobile.locator('.reorder-ctl').first().isVisible(), false, 'frecce nascoste finché non si preme Riordina');
-  await mobile.locator('.reorder-top').click();
-  await mobile.waitForSelector('.items .row .reorder-btn');
-  await mobile.locator('.items .row').nth(2).locator('.reorder-btn').first().click(); // ▲ sul terzo
+  // stella sempre visibile e tappabile
+  assert.strictEqual(await mobile.locator('.items .row.is-favorite .fav-badge').first().isVisible(), true, 'stella gialla sui preferiti');
+  await mobile.locator('.items .row').nth(1).locator('.fav-badge').click();
   await mobile.waitForTimeout(100);
-  assert.strictEqual(await stored(mobile), '1,3,2');
-  assert.strictEqual(await mobile.locator('.reorder-top').textContent(), 'Fatto');
-  await mobile.locator('.reorder-top').click();
-  assert.strictEqual(await mobile.locator('.reorder-ctl').first().isVisible(), false);
-  console.log('ok - telefono: Riordina mostra ▲▼, un tocco sposta e salva, Fatto li nasconde');
+  assert.strictEqual(await stored(mobile), '1,3', 'un tocco sulla stella toglie dai preferiti');
+  assert.strictEqual(await mobile.locator('.items .row').count(), 2);
+  assert.strictEqual(await mobile.locator('.items .row').first().locator('.fav-badge').evaluate(function (n) { return getComputedStyle(n).color; }), 'rgb(255, 185, 46)');
+  // pressione lunga e trascinamento: il 3 sopra l'1
+  async function touch(type, x, y) {
+    await mobile.evaluate(function (a) {
+      var target = a.type === 'touchstart' ? document.elementFromPoint(a.x, a.y) : (window.__touchTarget || document.elementFromPoint(a.x, a.y));
+      window.__touchTarget = target;
+      var t = new Touch({ identifier: 1, target: target, clientX: a.x, clientY: a.y });
+      var end = a.type === 'touchend';
+      target.dispatchEvent(new TouchEvent(a.type, { touches: end ? [] : [t], changedTouches: [t], bubbles: true, cancelable: true }));
+    }, { type: type, x: x, y: y });
+  }
+  var rows = await mobile.locator('.items .row').evaluateAll(function (list) {
+    return list.map(function (r) { var b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2 }; });
+  });
+  await touch('touchstart', rows[1].x, rows[1].y);
+  await mobile.waitForTimeout(600); // pressione lunga
+  assert.strictEqual(await mobile.locator('.items .row.is-dragging').count(), 1);
+  await touch('touchmove', rows[0].x, rows[0].y);
+  await touch('touchend', rows[0].x, rows[0].y);
+  await mobile.waitForTimeout(100);
+  assert.strictEqual(await stored(mobile), '3,1', 'trascinato in alto e salvato');
+  assert.strictEqual(await shown(mobile), 'Canale 3,Canale 1');
+  assert.strictEqual(await mobile.evaluate(function () { return Storage.getFavoritesOrderAt() > 0; }), true);
+  console.log('ok - telefono: stella sempre visibile e tappabile, pressione lunga + trascinamento riordinano');
 
   await browser.close();
   server.close();

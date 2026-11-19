@@ -134,6 +134,27 @@
       return true;
     },
 
+    /**
+     * Riordino col trascinamento: `keys` ("tipo:id") è il nuovo ordine dei preferiti di quel tipo
+     * (quelli non elencati restano in coda, nel loro ordine). Gli altri tipi non si muovono.
+     */
+    reorderFavorites: function (type, keys) {
+      var list = this.getFavorites();
+      var byKey = {};
+      list.forEach(function (f) { byKey[favKey(f.type, f.id)] = f; });
+      var sorted = [];
+      keys.forEach(function (k) { if (byKey[k] && byKey[k].type === type && sorted.indexOf(byKey[k]) === -1) sorted.push(byKey[k]); });
+      list.forEach(function (f) { if (f.type === type && sorted.indexOf(f) === -1) sorted.push(f); });
+      var next = 0;
+      var result = list.map(function (f) { return f.type === type ? sorted[next++] : f; });
+      if (JSON.stringify(result) === JSON.stringify(list)) return false;
+      write('favorites', result);
+      write('favOrderAt', Date.now());
+      favIndex = null;
+      if (Storage.onFavoritesChange) Storage.onFavoritesChange();
+      return true;
+    },
+
     /** Posizioni di ripresa per film ed episodi, in secondi. */
     getResume: function (key) {
       var entry = read('resume', {})[key];

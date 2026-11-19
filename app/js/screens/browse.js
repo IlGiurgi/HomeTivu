@@ -77,8 +77,7 @@
     layout: 'list',
     query: '',
     renderToken: 0,
-    movingKey: null, // TV: preferito "preso" per spostarlo (tasto GIALLO)
-    reorder: false // telefono: pulsanti ▲ ▼ su ogni preferito
+    movingKey: null // TV: preferito "preso" per spostarlo (tasto GIALLO)
   };
 
   // Arrivati in fondo alla lista (canali, film, guida) ▼ si ferma lì: non salta tra le categorie.
@@ -166,7 +165,7 @@
   }
 
   function favoriteHint() {
-    return isTouch() ? 'tieni premuto un canale, un film o una serie' : 'premi il tasto ROSSO su un contenuto';
+    return isTouch() ? 'tocca la stella accanto a un canale, un film o una serie' : 'premi il tasto ROSSO su un contenuto';
   }
 
   // ---------- Scorrimento a destra/sinistra sulla lista: categoria successiva/precedente ----------
@@ -206,7 +205,6 @@
     if (START_SECTIONS.indexOf(section) !== -1) Storage.setLastSection(section);
     state.categoryId = null;
     state.movingKey = null;
-    setReorder(false, false);
     markActiveTab();
     el.classList.toggle('no-categories', section === 'settings' || section === 'home');
     el.classList.toggle('section-home', section === 'home');
@@ -363,20 +361,20 @@
         h('span.fav-badge', { text: '★' })
       ]);
     }
-    if (canReorder() && item.type === state.categoryId) {
-      var ctl = h('span.reorder-ctl', {}, [
-        h('button.reorder-btn', { type: 'button', 'aria-label': 'Sposta su', text: '▲' }),
-        h('button.reorder-btn', { type: 'button', 'aria-label': 'Sposta giù', text: '▼' })
-      ]);
-      [-1, 1].forEach(function (delta, i) {
-        ctl.children[i].addEventListener('click', function (event) {
-          event.stopPropagation();
-          event.preventDefault();
-          moveFavorite(item, delta, delta);
-        });
+    // Stella sempre visibile (telefono): un tocco aggiunge o toglie dai preferiti.
+    var starEl = itemEl.querySelector('.fav-badge');
+    if (starEl) {
+      if (item.type === 'episode' || item.match) itemEl.classList.add('no-star');
+      starEl.setAttribute('role', 'button');
+      starEl.setAttribute('aria-label', 'Preferito');
+      starEl.addEventListener('click', function (event) {
+        event.stopPropagation();
+        event.preventDefault();
+        if (item.type !== 'episode' && !item.match) toggleFavorite(itemEl);
       });
-      itemEl.appendChild(ctl);
     }
+    // Preferiti: pressione lunga e trascinamento riordinano (vedi "Riordino dei preferiti"), non cambiano la stella.
+    if (inTypeCategory() && item.type === state.categoryId) itemEl.noLongPressFavorite = true;
     itemEl.setAttribute('data-zone', 'browse-items');
     itemEl.classList.toggle('is-moving', state.movingKey === item.type + ':' + item.id);
     itemEl.classList.toggle('is-favorite', fav);
@@ -707,31 +705,12 @@
 
   // ---------- Riordino dei preferiti ----------
   // TV: GIALLO prende il preferito, ▲▼ (o ◀▶ nelle locandine) lo spostano, OK/GIALLO/INDIETRO lo lasciano.
-  // Telefono: il pulsante in alto "Riordina" mostra ▲ ▼ su ogni riga. L'ordine arriva anche all'altro dispositivo (favsync.js).
+  // Telefono: pressione lunga su un preferito e trascinamento su/giù. L'ordine arriva anche all'altro dispositivo (favsync.js).
 
   var REORDER_TYPES = ['live', 'vod', 'series'];
 
   function inTypeCategory() {
     return state.section === 'favorites' && REORDER_TYPES.indexOf(state.categoryId) !== -1;
-  }
-
-  function canReorder() {
-    return state.reorder && inTypeCategory();
-  }
-
-  var reorderTopEl = h('button.reorder-top.mobile-only', { type: 'button', text: 'Riordina' });
-  topbarEl.insertBefore(reorderTopEl, searchTopEl);
-  reorderTopEl.addEventListener('click', function () {
-    setReorder(!state.reorder, true);
-  });
-
-  /** Mostra o nasconde (visible) il pulsante "Riordina" e accende o spegne (on) il riordino col tocco. */
-  function setReorder(on, visible) {
-    state.reorder = on;
-    reorderTopEl.textContent = on ? 'Fatto' : 'Riordina';
-    el.classList.toggle('can-reorder', visible);
-    el.classList.toggle('reordering', on);
-    if (visible && state.categoryId) refreshFavorites(state.categoryId, null);
   }
 
   /** Ridisegna la lista del tipo dopo uno spostamento; con `focusItem` rimette il focus su quel preferito. */
@@ -804,6 +783,93 @@
     return true;
   }
 
+  // Telefono: tieni premuto un preferito e trascinalo; al rilascio l'ordine viene salvato.
+  var DRAG_HOLD_MS = 400;
+  var DRAG_SLOP = 10;
+  var drag = null; // {el, timer, active, x, y, scroller}
+  var suppressClick = false;
+
+  function dragRow(target) {
+    var row = target && target.closest ? target.closest('.row, .card') : null;
+    return row && row.item && row.noLongPressFavorite && itemsEl.contains(row) ? row : null;
+  }
+
+  function dragEnd(save) {
+    if (!drag) return;
+    clearTimeout(drag.timer);
+    clearInterval(drag.scroller);
+    var was = drag;
+    drag = null;
+    if (!was.active) return;
+    was.el.classList.remove('is-dragging');
+    suppressClick = true;
+    if (!save) return;
+    var keys = Array.prototype.map.call(itemsEl.children, function (child) {
+      return child.item ? child.item.type + ':' + child.item.id : null;
+    }).filter(Boolean);
+    Storage.reorderFavorites(was.el.item.type, keys);
+    refreshFavorites(was.el.item.type, null);
+  }
+
+  function dragMove(x, y) {
+    var el = drag.el;
+    var rect = itemsEl.getBoundingClientRect();
+    drag.y = y;
+    var over = null;
+    Array.prototype.forEach.call(itemsEl.children, function (child) {
+      var r = child.getBoundingClientRect();
+      if (child !== el && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) over = child;
+    });
+    if (over) {
+      var before = el.compareDocumentPosition(over) & 4; // over viene dopo el: si passa oltre
+      itemsEl.insertBefore(el, before ? over.nextSibling : over);
+    }
+    drag.edge = y < rect.top + 70 ? -1 : y > rect.bottom - 70 ? 1 : 0;
+  }
+
+  itemsEl.addEventListener('touchstart', function (event) {
+    dragEnd(false);
+    suppressClick = false;
+    var row = dragRow(event.target);
+    if (!row || event.touches.length !== 1 || (event.target.closest && event.target.closest('.fav-badge'))) return;
+    var touch = event.touches[0];
+    drag = { el: row, x: touch.clientX, y: touch.clientY, active: false, edge: 0, timer: null, scroller: null };
+    drag.timer = setTimeout(function () {
+      if (!drag) return;
+      drag.active = true;
+      row.classList.add('is-dragging');
+      if (root.navigator.vibrate) root.navigator.vibrate(25);
+      drag.scroller = setInterval(function () {
+        if (drag && drag.edge) itemsEl.scrollTop += drag.edge * 14;
+      }, 16);
+    }, DRAG_HOLD_MS);
+  }, { passive: true });
+
+  itemsEl.addEventListener('touchmove', function (event) {
+    if (!drag) return;
+    var touch = event.touches[0];
+    if (!drag.active) {
+      // Dito che scorre prima del tempo: è uno scorrimento normale della lista.
+      if (Math.abs(touch.clientX - drag.x) > DRAG_SLOP || Math.abs(touch.clientY - drag.y) > DRAG_SLOP) dragEnd(false);
+      return;
+    }
+    event.preventDefault();
+    dragMove(touch.clientX, touch.clientY);
+  }, { passive: false });
+
+  itemsEl.addEventListener('touchend', function () { dragEnd(true); }, { passive: true });
+  itemsEl.addEventListener('touchcancel', function () { dragEnd(false); }, { passive: true });
+  itemsEl.addEventListener('contextmenu', function (event) {
+    if (drag || dragRow(event.target)) event.preventDefault();
+  });
+  // Il clic generato dal rilascio dopo un trascinamento non deve aprire il canale.
+  itemsEl.addEventListener('click', function (event) {
+    if (!suppressClick) return;
+    suppressClick = false;
+    event.stopPropagation();
+    event.preventDefault();
+  }, true);
+
   function showFavorites(selectedType) {
     var favorites = Storage.getFavorites();
     var watching = continueItems();
@@ -812,7 +878,6 @@
       select: function () {
         if (state.categoryId === 'continue') return;
         state.categoryId = 'continue';
-        setReorder(false, false);
         markActiveCategory();
         renderItems(watching, 'grid', 'Continua a guardare');
         if (!watching.length) showMessage('Qui compaiono i film e gli episodi che interrompi a metà.');
@@ -824,7 +889,6 @@
       select: function () {
         if (state.categoryId === 'matches') return;
         state.categoryId = 'matches';
-        setReorder(false, false);
         markActiveCategory();
         renderItems(matches, 'list', 'Le tue partite');
         if (!matches.length) {
@@ -842,8 +906,6 @@
           if (state.categoryId === type) return;
           state.categoryId = type;
           markActiveCategory();
-          el.classList.toggle('can-reorder', items.length > 1);
-          if (items.length < 2 && state.reorder) setReorder(false, false);
           renderItems(items, type === 'live' ? 'list' : 'grid', TYPE_LABELS[type]);
           if (!items.length) showMessage('Nessun preferito: per aggiungerne uno ' + favoriteHint() + '.');
         }
@@ -1802,7 +1864,7 @@
     enter: function (params) {
       if (isTouch() && !Storage.getFlag('touchTips')) {
         Storage.setFlag('touchTips');
-        UI.toast('Suggerimento: tieni premuto un contenuto per i preferiti, scorri a destra o sinistra per cambiare categoria, il tasto \u2630 apre le sezioni', 7000);
+        UI.toast('Suggerimento: tocca la stella per i preferiti (in Preferiti tieni premuto e trascina per riordinare), scorri a destra o sinistra per cambiare categoria, il tasto \u2630 apre le sezioni', 7000);
       }
       MiniPlayer.onChange = renderMini;
       renderMini();

@@ -2897,29 +2897,20 @@ html.mobile .cat-filter {
 html.mobile #screen-browse:not(.cat-inline):not(.no-categories) .items-title { display: none; }
 
 /* Riordino dei preferiti */
-.reorder-top { display: none; }
-html.mobile .reorder-top.mobile-only { display: none; }
-html.mobile .can-reorder .reorder-top.mobile-only {
-  display: block;
-  margin-right: 8px;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 14px;
-  background: #2a2f3f;
-  color: #f2f4f8;
-  font-size: 14px;
-}
-html.mobile .reordering .reorder-top.mobile-only { background: #ffb92e; color: #10131c; }
-.reorder-ctl { display: none; }
-html.mobile .reordering .reorder-ctl { display: inline-flex; margin-left: 8px; }
-html.mobile .reordering .card .reorder-ctl { position: absolute; left: 4px; right: 4px; bottom: 34px; justify-content: space-between; margin: 0; }
-.reorder-btn {
-  min-width: 44px;
-  min-height: 36px;
-  border: 0;
-  border-radius: 8px;
-  background: #ffb92e;
-  color: #10131c;
-  font-size: 16px;
-}
 .is-moving { outline: 4px solid #ffb92e; outline-offset: -4px; background: rgba(255, 185, 46, 0.18); }
+.is-dragging { outline: 2px solid #ffb92e; outline-offset: -2px; background: rgba(255, 185, 46, 0.22); }
+
+/* Telefono: la stella è sempre visibile e si tocca (grigia = non preferito, gialla = preferito). */
+html.mobile .fav-badge {
+  display: inline-block;
+  min-width: 40px;
+  padding: 6px 4px;
+  color: #5d6578;
+  font-size: 24px;
+  line-height: 1;
+  text-align: center;
+}
+html.mobile .is-favorite .fav-badge { color: #ffb92e; }
+html.mobile .no-star .fav-badge { display: none; }
+html.mobile .card .fav-badge { top: 2px; right: 2px; background: rgba(16, 19, 28, 0.55); border-radius: 12px; }
+html.mobile .row, html.mobile .card { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

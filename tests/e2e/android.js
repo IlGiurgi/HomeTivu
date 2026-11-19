@@ -134,7 +134,7 @@ async function main() {
   await page.waitForSelector('#screen-browse.active .items .row');
 
   await step('al primo avvio su telefono compare il suggerimento sui gesti', async function () {
-    assert.match(await page.textContent('#toast'), /tieni premuto/);
+    assert.match(await page.textContent('#toast'), /stella/);
   });
 
   await step('layout per telefono e tasto Indietro registrato', async function () {
@@ -190,9 +190,9 @@ async function main() {
     await page.waitForSelector('.items .row');
   });
 
-  await step('preferiti col dito: pressione prolungata aggiunge e rimuove, senza aprire il canale', async function () {
+  await step('preferiti col dito: pressione prolungata aggiunge (senza aprire il canale), la stella rimuove', async function () {
     await openSection('favorites');
-    assert.match(await page.textContent('.items'), /tieni premuto/);
+    assert.match(await page.textContent('.items'), /stella/);
     await openSection('live');
     await page.waitForSelector('.items .row');
     var playsBefore = await page.evaluate(function () { return window.fakeAndroid.plays.length; });
@@ -205,8 +205,8 @@ async function main() {
     assert.strictEqual(await page.evaluate(function () { return document.querySelector('.screen.active').id; }), 'screen-browse');
     await openSection('favorites');
     assert.strictEqual(await page.locator('.items .row').count(), 1);
-    await longPress('.items .row >> nth=0');
-    assert.strictEqual(await page.locator('.items .row').count(), 0, 'seconda pressione: rimosso');
+    await page.locator('.items .row >> nth=0 >> .fav-badge').click();
+    assert.strictEqual(await page.locator('.items .row').count(), 0, 'tocco sulla stella: rimosso');
     await openSection('live');
     await page.waitForSelector('.items .row');
   });

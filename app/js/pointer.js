@@ -57,7 +57,7 @@
     cancelPress();
     longPressDone = false;
     var el = itemElement(event.target);
-    if (!el || event.touches.length !== 1) return;
+    if (!el || el.noLongPressFavorite || event.touches.length !== 1) return;
     var touch = event.touches[0];
     press = { el: el, x: touch.clientX, y: touch.clientY, timer: setTimeout(function () { longPress(el); }, LONG_PRESS_MS) };
   }, { passive: true });
@@ -86,6 +86,7 @@
     var el = itemElement(event.target);
     if (!el && !press) return;
     event.preventDefault();
+    if (el && el.noLongPressFavorite) return; // Preferiti: la pressione lunga serve a riordinare
     if (press) longPress(press.el); // il menu contestuale è arrivato prima del nostro timer
     else if (!longPressDone) longPress(el);
   });

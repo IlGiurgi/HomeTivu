@@ -125,3 +125,17 @@ test('moveFavorite: sposta solo tra preferiti dello stesso tipo e aggiorna l\'or
   assert.strictEqual(Storage.moveFavorite({ type: 'live', id: '2' }, -1), false, 'già in cima');
   assert.strictEqual(Storage.moveFavorite({ type: 'live', id: '3' }, 1), false, 'già in fondo');
 });
+
+test('reorderFavorites: riordina solo i preferiti di quel tipo, i mancanti in coda', function () {
+  var data = {};
+  var context = { localStorage: { getItem: function (k) { return k in data ? data[k] : null; }, setItem: function (k, v) { data[k] = String(v); }, removeItem: function (k) { delete data[k]; } }, Date: Date };
+  context.window = context;
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../app/js/storage.js'), 'utf8'), context);
+  var Storage = context.Storage;
+  ['live:1', 'vod:9', 'live:2', 'live:3'].forEach(function (k) { Storage.toggleFavorite({ type: k.split(':')[0], id: k.split(':')[1], name: k }); });
+  function order() { return Storage.getFavorites().map(function (f) { return f.type + ':' + f.id; }).join(','); }
+  assert.strictEqual(Storage.reorderFavorites('live', ['live:3', 'live:1']), true);
+  assert.strictEqual(order(), 'live:3,vod:9,live:1,live:2');
+  assert.ok(Storage.getFavoritesOrderAt() > 0);
+  assert.strictEqual(Storage.reorderFavorites('live', ['live:3', 'live:1', 'live:2']), false, 'nessun cambiamento');
+});
