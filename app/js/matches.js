@@ -11,11 +11,12 @@
 (function (root) {
   'use strict';
 
-  var SCAN_EVERY_MS = 3 * 3600000;
+  var SCAN_EVERY_MS = 24 * 3600000; // una raffica di richieste di guida: al massimo una al giorno (o a richiesta)
   var GAP_MS = 1500; // pausa tra due canali
   var WATCHING_WAIT_MS = 30000; // mentre si guarda un canale la ricerca si ferma e riprende a fine visione
   var EPG_LIMIT = 20; // programmi per canale: circa un giorno sui canali sportivi
-  var MAX_CHANNELS = 80;
+  var MAX_CHANNELS = 30;
+  var MAX_FAILURES = 3; // richieste di guida rifiutate di fila: il provider non risponde, la ricerca si ferma
   var HORIZON_MS = 48 * 3600000;
   var ALERT_BEFORE_MS = 10 * 60000;
   var ALERT_SHOW_MS = 30000;
@@ -215,6 +216,7 @@
       App.loadSection('live').then(function (data) {
         var groups = candidates(data);
         var scanned = [];
+        var failures = 0;
         var client = App.client;
         function step(i) {
           if (App.client !== client) { // disconnesso o cambiato account
@@ -223,6 +225,11 @@
           }
           if (Player.url) { // si è aperto un canale a ricerca in corso: pausa finché non si smette
             setTimeout(function () { step(i); }, WATCHING_WAIT_MS);
+            return;
+          }
+          if (failures >= MAX_FAILURES || client.epgBlocked()) { // il provider rifiuta la guida: si smette, senza perdere le partite già trovate
+            scanning = false;
+            Storage.setMatches({ at: Date.now(), terms: terms.join(','), items: last.items || [] });
             return;
           }
           if (i >= groups.length) {
@@ -237,8 +244,9 @@
             return;
           }
           client.getShortEpg(groups[i][0].id, EPG_LIMIT).then(function (epg) {
+            failures = 0;
             scanned.push({ channels: groups[i], epg: epg });
-          }, function () { /* canale senza guida */ }).then(function () {
+          }, function () { failures++; /* canale senza guida */ }).then(function () {
             setTimeout(function () { step(i + 1); }, Matches.gapMs);
           });
         }

@@ -53,6 +53,7 @@
   var USER_AGENTS = { vlc: 'VLC/3.0.20 LibVLC/3.0.20', smarters: 'IPTVSmartersPro' };
   var userAgent = ''; // '' = quello del sistema
   var lastStatus = 0; // ultimo codice HTTP letto sullo stream dopo un errore (0 = sconosciuto)
+  var probedUrl = ''; // stream di cui si è già letto il codice HTTP in questo episodio d'errore: non si richiede di nuovo
 
   var sources = []; // [{url, label}]: il contenuto scelto e i suoi feed alternativi
   var sourceIndex = 0;
@@ -404,6 +405,7 @@
 
   function onPrepared() {
     lastStatus = 0;
+    probedUrl = '';
     watch.prepared = true;
     watch.bufferingSince = 0;
     watch.lastProgress = Date.now();
@@ -423,7 +425,8 @@
     if (!sources.length || retryTimer || watch.failed) return;
     if (waitedMs) message += ' (dopo ' + Math.round(waitedMs / 1000) + ' s' + (isLive ? '' : ', film/serie') + ')';
     session++; // le risposte in arrivo dall'apertura fallita non contano più
-    if (attempt >= RETRY_DELAYS.length) {
+    // Un 404 sullo stream non passa da solo: si prova ancora una volta per ogni feed (il canale può avere varianti), poi ci si ferma.
+    if (attempt >= RETRY_DELAYS.length || (lastStatus === 404 && attempt >= 1 + sources.length)) {
       giveUp(message);
       return;
     }
@@ -439,10 +442,15 @@
     closeEngine(); // prima si chiude la connessione, poi si interroga il server: mai due connessioni insieme
     var mine = session;
     // Il codice HTTP del provider si legge a parte e finisce nella cronologia; con 403/429 si aspetta di più.
-    var probed = probeStatus(failedUrl).then(function (status) {
-      lastStatus = status;
-      if (status) note('risposta del server: HTTP ' + status + (status === 403 ? ' (accesso negato o limite di connessioni)' : ''));
-    });
+    // Una sola volta per stream e per episodio d'errore: ogni lettura è una connessione in più verso il provider.
+    var probed = Promise.resolve();
+    if (probedUrl !== failedUrl) {
+      probedUrl = failedUrl;
+      probed = probeStatus(failedUrl).then(function (status) {
+        lastStatus = status;
+        if (status) note('risposta del server: HTTP ' + status + (status === 403 ? ' (accesso negato o limite di connessioni)' : ''));
+      });
+    }
     emit('retrying', { attempt: attempt, max: RETRY_DELAYS.length, label: sources[sourceIndex].label, switched: switched });
     retryTimer = setTimeout(function () {
       probed.then(function () {

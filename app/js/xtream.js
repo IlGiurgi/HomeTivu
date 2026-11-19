@@ -102,9 +102,9 @@
     return Object.keys(episodes).sort(function (a, b) { return Number(a) - Number(b); });
   }
 
-  var RETRY_DELAYS = [1500, 3000]; // un host del provider che è giù un attimo risponde spesso 404/502/503
+  var RETRY_DELAYS = [3000]; // un solo nuovo tentativo, e solo sugli errori 5xx del server: un 404 ripetuto è una richiesta in più verso un provider che sta già rifiutando
 
-  /** Richiesta GET JSON; se il server risponde 404 o 5xx la ripete un paio di volte prima di arrendersi. */
+  /** Richiesta GET JSON; se il server risponde 5xx la ripete una volta prima di arrendersi (il 404 no). */
   function xhrJson(url, timeout, noRetry) {
     var attempt = 0;
     var what = typeof Netlog !== 'undefined' ? Netlog.describeApi(url) : '';
@@ -144,7 +144,7 @@
         if (xhr.status < 200 || xhr.status >= 300) {
           var httpErr = new Error('Errore HTTP ' + xhr.status + httpHint(xhr.status));
           httpErr.status = xhr.status;
-          httpErr.retryable = xhr.status === 404 || xhr.status >= 500;
+          httpErr.retryable = xhr.status >= 500;
           reject(httpErr);
           return;
         }
