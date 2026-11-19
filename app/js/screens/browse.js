@@ -76,7 +76,9 @@
     rendered: 0,
     layout: 'list',
     query: '',
-    renderToken: 0
+    renderToken: 0,
+    movingKey: null, // TV: preferito "preso" per spostarlo (tasto GIALLO)
+    reorder: false // telefono: pulsanti ▲ ▼ su ogni preferito
   };
 
   // Arrivati in fondo alla lista (canali, film, guida) ▼ si ferma lì: non salta tra le categorie.
@@ -203,6 +205,8 @@
     state.section = section;
     if (START_SECTIONS.indexOf(section) !== -1) Storage.setLastSection(section);
     state.categoryId = null;
+    state.movingKey = null;
+    setReorder(false, false);
     markActiveTab();
     el.classList.toggle('no-categories', section === 'settings' || section === 'home');
     el.classList.toggle('section-home', section === 'home');
@@ -359,7 +363,22 @@
         h('span.fav-badge', { text: '★' })
       ]);
     }
+    if (canReorder() && item.type === state.categoryId) {
+      var ctl = h('span.reorder-ctl', {}, [
+        h('button.reorder-btn', { type: 'button', 'aria-label': 'Sposta su', text: '▲' }),
+        h('button.reorder-btn', { type: 'button', 'aria-label': 'Sposta giù', text: '▼' })
+      ]);
+      [-1, 1].forEach(function (delta, i) {
+        ctl.children[i].addEventListener('click', function (event) {
+          event.stopPropagation();
+          event.preventDefault();
+          moveFavorite(item, delta, delta);
+        });
+      });
+      itemEl.appendChild(ctl);
+    }
     itemEl.setAttribute('data-zone', 'browse-items');
+    itemEl.classList.toggle('is-moving', state.movingKey === item.type + ':' + item.id);
     itemEl.classList.toggle('is-favorite', fav);
     itemEl.classList.toggle('is-live', item.type === 'live');
     itemEl.item = item;
@@ -686,6 +705,105 @@
     });
   }
 
+  // ---------- Riordino dei preferiti ----------
+  // TV: GIALLO prende il preferito, ▲▼ (o ◀▶ nelle locandine) lo spostano, OK/GIALLO/INDIETRO lo lasciano.
+  // Telefono: il pulsante in alto "Riordina" mostra ▲ ▼ su ogni riga. L'ordine arriva anche all'altro dispositivo (favsync.js).
+
+  var REORDER_TYPES = ['live', 'vod', 'series'];
+
+  function inTypeCategory() {
+    return state.section === 'favorites' && REORDER_TYPES.indexOf(state.categoryId) !== -1;
+  }
+
+  function canReorder() {
+    return state.reorder && inTypeCategory();
+  }
+
+  var reorderTopEl = h('button.reorder-top.mobile-only', { type: 'button', text: 'Riordina' });
+  topbarEl.insertBefore(reorderTopEl, searchTopEl);
+  reorderTopEl.addEventListener('click', function () {
+    setReorder(!state.reorder, true);
+  });
+
+  /** Mostra o nasconde (visible) il pulsante "Riordina" e accende o spegne (on) il riordino col tocco. */
+  function setReorder(on, visible) {
+    state.reorder = on;
+    reorderTopEl.textContent = on ? 'Fatto' : 'Riordina';
+    el.classList.toggle('can-reorder', visible);
+    el.classList.toggle('reordering', on);
+    if (visible && state.categoryId) refreshFavorites(state.categoryId, null);
+  }
+
+  /** Ridisegna la lista del tipo dopo uno spostamento; con `focusItem` rimette il focus su quel preferito. */
+  function refreshFavorites(type, focusItem) {
+    var top = itemsEl.scrollTop;
+    state.categoryId = null;
+    showFavorites(type);
+    itemsEl.scrollTop = top;
+    if (!focusItem) return;
+    var key = focusItem.type + ':' + focusItem.id;
+    var index = -1;
+    state.items.forEach(function (it, i) { if (it.type + ':' + it.id === key) index = i; });
+    while (index >= itemsEl.children.length && state.rendered < state.items.length) renderMore();
+    var target = itemsEl.children[index];
+    if (target) Nav.focus(target);
+  }
+
+  /** Sposta di `steps` posti (segno = direzione); delta = direzione di ogni passo. */
+  function moveFavorite(item, delta, steps) {
+    var n = Math.abs(steps);
+    var moved = false;
+    for (var i = 0; i < n; i++) {
+      if (!Storage.moveFavorite(item, delta)) break;
+      moved = true;
+    }
+    if (moved) refreshFavorites(item.type, state.movingKey ? item : null);
+    return moved;
+  }
+
+  /** Locandine su una riga della griglia (per ▲▼ nel riordino). */
+  function gridColumns() {
+    var first = itemsEl.children[0];
+    if (!first) return 1;
+    var cols = 0;
+    Array.prototype.forEach.call(itemsEl.children, function (child) { if (child.offsetTop === first.offsetTop) cols++; });
+    return Math.max(1, cols);
+  }
+
+  function endMoving(message) {
+    state.movingKey = null;
+    Array.prototype.forEach.call(itemsEl.children, function (child) { child.classList.remove('is-moving'); });
+    if (message) UI.toast(message);
+  }
+
+  /** TV, riordino in corso: true se il tasto è stato usato. */
+  function handleMovingKey(action) {
+    var item = Nav.current && Nav.current.item;
+    if (action === 'enter' || action === 'yellow' || action === 'back') {
+      endMoving('Posizione salvata');
+      return true;
+    }
+    var grid = state.layout === 'grid';
+    var delta = 0;
+    var steps = 1;
+    if (action === 'up') { delta = -1; steps = grid ? gridColumns() : 1; }
+    else if (action === 'down') { delta = 1; steps = grid ? gridColumns() : 1; }
+    else if (grid && action === 'left') delta = -1;
+    else if (grid && action === 'right') delta = 1;
+    else return false;
+    if (item) moveFavorite(item, delta, steps);
+    return true;
+  }
+
+  function startMoving() {
+    var item = Nav.current && Nav.current.item;
+    if (!item || !inTypeCategory() || item.type !== state.categoryId) return false;
+    state.movingKey = item.type + ':' + item.id;
+    Nav.current.classList.add('is-moving');
+    UI.toast(state.layout === 'grid' ? 'Sposta con le frecce, OK per fissare' : 'Sposta con ▲ ▼, OK per fissare', 4000);
+    return true;
+  }
+
   function showFavorites(selectedType) {
     var favorites = Storage.getFavorites();
     var watching = continueItems();
@@ -694,6 +812,7 @@
       select: function () {
         if (state.categoryId === 'continue') return;
         state.categoryId = 'continue';
+        setReorder(false, false);
         markActiveCategory();
         renderItems(watching, 'grid', 'Continua a guardare');
         if (!watching.length) showMessage('Qui compaiono i film e gli episodi che interrompi a metà.');
@@ -705,6 +824,7 @@
       select: function () {
         if (state.categoryId === 'matches') return;
         state.categoryId = 'matches';
+        setReorder(false, false);
         markActiveCategory();
         renderItems(matches, 'list', 'Le tue partite');
         if (!matches.length) {
@@ -722,6 +842,8 @@
           if (state.categoryId === type) return;
           state.categoryId = type;
           markActiveCategory();
+          el.classList.toggle('can-reorder', items.length > 1);
+          if (items.length < 2 && state.reorder) setReorder(false, false);
           renderItems(items, type === 'live' ? 'list' : 'grid', TYPE_LABELS[type]);
           if (!items.length) showMessage('Nessun preferito: per aggiungerne uno ' + favoriteHint() + '.');
         }
@@ -1721,6 +1843,8 @@
           return true;
         }
       }
+      if (state.movingKey && handleMovingKey(action)) return true;
+      if (action === 'yellow' && startMoving()) return true;
       if (action === 'red' && Nav.current && Nav.current.item) {
         toggleFavorite(Nav.current);
         return true;

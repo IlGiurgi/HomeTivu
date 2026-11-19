@@ -105,10 +105,33 @@
     /** Preferiti tolti di recente: {"tipo:id": ora della rimozione}, per propagare le rimozioni all'altro dispositivo. */
     getFavoritesGone: function () { return read('favGone', {}); },
     /** Sostituisce l'elenco con quello unito dalla sincronizzazione (non riparte la sincronizzazione). */
-    replaceFavorites: function (items, gone) {
+    replaceFavorites: function (items, gone, orderAt) {
       write('favorites', items);
       write('favGone', gone);
+      if (typeof orderAt === 'number') write('favOrderAt', orderAt);
       favIndex = null;
+    },
+    /** Ora dell'ultimo riordino: tra telefono e TV vale l'ordine di chi ha riordinato per ultimo. */
+    getFavoritesOrderAt: function () { return read('favOrderAt', 0); },
+    /**
+     * Sposta un preferito di un posto (delta -1 = su, +1 = giù) tra quelli dello stesso tipo.
+     * Restituisce false se è già al limite.
+     */
+    moveFavorite: function (item, delta) {
+      var list = this.getFavorites();
+      var from = -1;
+      list.forEach(function (f, i) { if (favKey(f.type, f.id) === favKey(item.type, item.id)) from = i; });
+      if (from === -1) return false;
+      var to = from + delta;
+      while (to >= 0 && to < list.length && list[to].type !== item.type) to += delta;
+      if (to < 0 || to >= list.length) return false;
+      var moved = list.splice(from, 1)[0];
+      list.splice(to, 0, moved);
+      write('favorites', list);
+      write('favOrderAt', Date.now());
+      favIndex = null;
+      if (Storage.onFavoritesChange) Storage.onFavoritesChange();
+      return true;
     },
 
     /** Posizioni di ripresa per film ed episodi, in secondi. */

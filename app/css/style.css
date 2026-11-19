@@ -2895,3 +2895,31 @@ html.mobile .cat-filter {
 
 /* Il titolo della lista ripeterebbe il nome sul pulsante delle categorie. */
 html.mobile #screen-browse:not(.cat-inline):not(.no-categories) .items-title { display: none; }
+
+/* Riordino dei preferiti */
+.reorder-top { display: none; }
+html.mobile .reorder-top.mobile-only { display: none; }
+html.mobile .can-reorder .reorder-top.mobile-only {
+  display: block;
+  margin-right: 8px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: #2a2f3f;
+  color: #f2f4f8;
+  font-size: 14px;
+}
+html.mobile .reordering .reorder-top.mobile-only { background: #ffb92e; color: #10131c; }
+.reorder-ctl { display: none; }
+html.mobile .reordering .reorder-ctl { display: inline-flex; margin-left: 8px; }
+html.mobile .reordering .card .reorder-ctl { position: absolute; left: 4px; right: 4px; bottom: 34px; justify-content: space-between; margin: 0; }
+.reorder-btn {
+  min-width: 44px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffb92e;
+  color: #10131c;
+  font-size: 16px;
+}
+.is-moving { outline: 4px solid #ffb92e; outline-offset: -4px; background: rgba(255, 185, 46, 0.18); }

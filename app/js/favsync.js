@@ -6,7 +6,7 @@
  *
  * Unione: per ogni canale/film/serie vince la modifica più recente. Aggiungere porta `at` (ora dell'aggiunta),
  * togliere lascia una traccia in `gone` (ora della rimozione), così una rimozione non viene "resuscitata" dall'altro
- * dispositivo. Preferiti vecchi, senza ora, valgono 0: si aggiungono da entrambe le parti e perdono solo contro una rimozione.
+ * dispositivo. Il riordino porta `orderAt`: vale l'ordine di chi ha riordinato per ultimo. Preferiti vecchi, senza ora, valgono 0: si aggiungono da entrambe le parti e perdono solo contro una rimozione.
  * Codice ES2015 senza async/await (Tizen 3.0).
  */
 (function (root) {
@@ -53,6 +53,18 @@
     var items = {};
     var order = [];
     var gone = {};
+    var localAt = Number(local.orderAt) || 0;
+    var remoteAt = Number(remote.orderAt) || 0;
+    var orderAt = Math.max(localAt, remoteAt);
+    // Ha riordinato per ultimo chi ha l'ora più recente: la sua lista fa da ordine (pari = nessun riordino).
+    var leader = orderAt > 0 ? (remoteAt > localAt ? remote : local) : null;
+    var rank = {};
+    if (leader) {
+      (leader.items || []).forEach(function (raw, i) {
+        var it = clean(raw);
+        if (it) rank[keyOf(it)] = i;
+      });
+    }
     [local, remote].forEach(function (side) {
       (side.items || []).forEach(function (raw) {
         var item = clean(raw);
@@ -73,8 +85,18 @@
     Object.keys(gone).forEach(function (k) { if (now - gone[k] > GONE_TTL_MS) delete gone[k]; });
     // sort stabile a mano: Array.sort di Chromium 47 non lo garantisce
     var indexed = result.map(function (item, i) { return { item: item, i: i }; });
-    indexed.sort(function (a, b) { return ((a.item.at || 0) - (b.item.at || 0)) || (a.i - b.i); });
-    return { items: indexed.map(function (x) { return x.item; }), gone: gone };
+    // Con un riordino: prima i preferiti nell'ordine scelto, poi quelli arrivati dopo (per ora di aggiunta).
+    indexed.sort(function (a, b) {
+      if (leader) {
+        var ra = rank[keyOf(a.item)];
+        var rb = rank[keyOf(b.item)];
+        if (ra !== undefined && rb !== undefined) return ra - rb;
+        if (ra !== undefined) return -1;
+        if (rb !== undefined) return 1;
+      }
+      return ((a.item.at || 0) - (b.item.at || 0)) || (a.i - b.i);
+    });
+    return { items: indexed.map(function (x) { return x.item; }), gone: gone, orderAt: orderAt };
   }
 
   function same(a, b) {
@@ -94,9 +116,9 @@
   function readRemote() {
     return root.Home.request('/api/states/' + ENTITY, undefined, QUICK_MS).then(function (s) {
       var attrs = (s && s.attributes) || {};
-      return { items: Array.isArray(attrs.items) ? attrs.items : [], gone: attrs.gone || {} };
+      return { items: Array.isArray(attrs.items) ? attrs.items : [], gone: attrs.gone || {}, orderAt: Number(attrs.orderAt) || 0 };
     }, function (err) {
-      if (/404/.test(err.message)) return { items: [], gone: {} }; // ancora mai scritta
+      if (/404/.test(err.message)) return { items: [], gone: {}, orderAt: 0 }; // ancora mai scritta
       throw err;
     });
   }
@@ -112,15 +134,15 @@
       if (busy) { again = true; return Promise.resolve(false); }
       busy = true;
       return readRemote().then(function (remote) {
-        var local = { items: root.Storage.getFavorites(), gone: root.Storage.getFavoritesGone() };
+        var local = { items: root.Storage.getFavorites(), gone: root.Storage.getFavoritesGone(), orderAt: root.Storage.getFavoritesOrderAt() };
         var merged = merge(local, remote, Date.now());
-        if (!same(merged.items, local.items) || !same(merged.gone, local.gone)) {
-          root.Storage.replaceFavorites(merged.items, merged.gone);
+        if (!same(merged.items, local.items) || !same(merged.gone, local.gone) || merged.orderAt !== local.orderAt) {
+          root.Storage.replaceFavorites(merged.items, merged.gone, merged.orderAt);
         }
-        if (same(merged.items, remote.items) && same(merged.gone, remote.gone)) return true;
+        if (same(merged.items, remote.items) && same(merged.gone, remote.gone) && merged.orderAt === remote.orderAt) return true;
         return root.Home.request('/api/states/' + ENTITY, {
           state: String(merged.items.length),
-          attributes: { friendly_name: 'Preferiti HomeTivu', icon: 'mdi:star', items: merged.items, gone: merged.gone }
+          attributes: { friendly_name: 'Preferiti HomeTivu', icon: 'mdi:star', items: merged.items, gone: merged.gone, orderAt: merged.orderAt }
         }, QUICK_MS).then(function () { return true; });
       }).then(function (ok) {
         FavSync.status = 'ok ' + new Date().toISOString().slice(11, 19);

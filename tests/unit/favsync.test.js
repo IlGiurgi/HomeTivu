@@ -72,7 +72,7 @@ test('sync: legge da HA, unisce, aggiorna il locale e riscrive; 404 = lista anco
       }
     },
     Storage: {
-      getFavorites: function () { return local.items; }, getFavoritesGone: function () { return local.gone; },
+      getFavorites: function () { return local.items; }, getFavoritesGone: function () { return local.gone; }, getFavoritesOrderAt: function () { return 0; },
       replaceFavorites: function (items, gone) { local = { items: items, gone: gone }; }
     }
   };
@@ -95,4 +95,33 @@ test('sync: legge da HA, unisce, aggiorna il locale e riscrive; 404 = lista anco
     down = true;
     return Sync.sync().then(function (ok) { assert.strictEqual(ok, false); assert.match(Sync.status, /errore/); });
   });
+});
+
+test('riordino: vale l\'ordine di chi ha riordinato per ultimo, i nuovi vanno in fondo', function () {
+  var a = [fav('1', 100), fav('2', 200), fav('3', 300)];
+  // il telefono ha riordinato (3,1,2) più tardi; la TV ha aggiunto il 4 dopo
+  var phone = { items: [a[2], a[0], a[1]], gone: {}, orderAt: 1000 };
+  var tv = { items: a.concat([fav('4', 400)]), gone: {}, orderAt: 0 };
+  assert.deepStrictEqual(ids(FavSync.merge(phone, tv, NOW)), ['3', '1', '2', '4']);
+  assert.deepStrictEqual(ids(FavSync.merge(tv, phone, NOW)), ['3', '1', '2', '4'], 'stesso risultato da entrambe le parti');
+  assert.strictEqual(FavSync.merge(phone, tv, NOW).orderAt, 1000);
+  // la TV riordina dopo: vince la TV
+  var tv2 = { items: [a[1], a[0], a[2]], gone: {}, orderAt: 2000 };
+  assert.deepStrictEqual(ids(FavSync.merge(phone, tv2, NOW)), ['2', '1', '3']);
+});
+
+test('moveFavorite: sposta solo tra preferiti dello stesso tipo e aggiorna l\'ora del riordino', function () {
+  var data = {};
+  var context = { localStorage: { getItem: function (k) { return k in data ? data[k] : null; }, setItem: function (k, v) { data[k] = String(v); }, removeItem: function (k) { delete data[k]; } }, Date: Date };
+  context.window = context;
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../app/js/storage.js'), 'utf8'), context);
+  var Storage = context.Storage;
+  ['live:1', 'vod:9', 'live:2', 'live:3'].forEach(function (k) { Storage.toggleFavorite({ type: k.split(':')[0], id: k.split(':')[1], name: k }); });
+  function order() { return Storage.getFavorites().map(function (f) { return f.type + ':' + f.id; }).join(','); }
+  assert.strictEqual(Storage.getFavoritesOrderAt(), 0);
+  assert.strictEqual(Storage.moveFavorite({ type: 'live', id: '2' }, -1), true);
+  assert.strictEqual(order(), 'live:2,live:1,vod:9,live:3', 'salta il film');
+  assert.ok(Storage.getFavoritesOrderAt() > 0);
+  assert.strictEqual(Storage.moveFavorite({ type: 'live', id: '2' }, -1), false, 'già in cima');
+  assert.strictEqual(Storage.moveFavorite({ type: 'live', id: '3' }, 1), false, 'già in fondo');
 });
