@@ -705,6 +705,20 @@ html.mobile .mini-player { display: none; }
 
 .card-progress-bar { height: 100%; background: #ffb92e; }
 
+/* "Continua a guardare": episodio e tempo che resta */
+.card-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 18px;
+  z-index: 2;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 22px;
+  white-space: nowrap;
+}
+
 .card .fav-badge {
   position: absolute;
   top: 14px;
@@ -839,6 +853,7 @@ html.mobile .mini-player { display: none; }
 .detail-actions { margin-bottom: 10px; }
 
 .detail-seasons,
+.detail-ranges,
 .detail-episodes { display: none; }
 
 .is-series .detail-seasons {
@@ -847,6 +862,15 @@ html.mobile .mini-player { display: none; }
   margin-bottom: 16px;
   padding: 6px;
 }
+
+.has-ranges .detail-ranges {
+  display: block;
+  white-space: nowrap;
+  margin-bottom: 12px;
+  padding: 6px;
+}
+
+.season.range { padding: 8px 22px; font-size: 24px; }
 
 .is-series .detail-episodes {
   display: block;
@@ -870,7 +894,7 @@ html.mobile .mini-player { display: none; }
   position: relative;
   display: flex;
   align-items: center;
-  height: 76px;
+  height: 112px;
   padding: 0 26px;
   margin-bottom: 6px;
   border-radius: 10px;
@@ -878,12 +902,40 @@ html.mobile .mini-player { display: none; }
   overflow: hidden;
 }
 
-.episode-title {
+.episode-thumb {
+  flex: none;
+  width: 160px;
+  height: 90px;
+  margin: 0 22px 0 -10px;
+  border-radius: 6px;
+  background: #0e1017;
+  object-fit: cover;
+}
+
+.episode-text {
   flex: 1;
+  min-width: 0;
+  display: block;
+}
+
+.episode-title {
+  display: block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+.episode-plot {
+  display: block;
+  margin-top: 6px;
+  max-height: 52px;
+  overflow: hidden;
+  color: #98a0b3;
+  font-size: 20px;
+  line-height: 26px;
+}
+
+.episode.focused .episode-plot { color: #dfe4ef; }
 
 .episode-duration {
   margin-left: 20px;
@@ -1477,7 +1529,17 @@ html.mobile .is-series .detail-episodes {
   padding: 2px;
 }
 
-html.mobile .episode { height: 50px; padding: 0 12px; }
+html.mobile .episode { height: 64px; padding: 0 12px; }
+
+html.mobile .episode-thumb { width: 72px; height: 40px; margin: 0 10px 0 0; }
+
+html.mobile .episode-plot { display: none; }
+
+html.mobile .card-badge { font-size: 11px; padding: 2px 6px; left: 6px; bottom: 10px; }
+
+html.mobile .season.range { font-size: 13px; padding: 6px 12px; }
+
+html.mobile .has-ranges .detail-ranges { flex: none; overflow-x: auto; margin-bottom: 6px; padding: 2px; }
 
 html.mobile .episode-duration { font-size: 12px; margin-left: 8px; }
 

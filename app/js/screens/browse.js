@@ -334,6 +334,7 @@
         h('div.poster', {}, [
           UI.img(item.icon, 'poster-img'),
           h('span.poster-fallback', { text: item.name }),
+          item.resumeAt !== undefined ? h('div.card-badge', { text: resumeBadge(item) }) : null,
           item.progress ? h('div.card-progress', {}, [h('div.card-progress-bar', {
             style: 'width:' + (item.progress * 100).toFixed(1) + '%'
           })]) : null
@@ -687,6 +688,19 @@
       item.progress = entry.duration ? Math.min(1, entry.position / entry.duration) : 0;
       return item;
     });
+  }
+
+  /** "S2 E5 · 23 min" (o solo il tempo che resta) sulla locandina di un contenuto lasciato a metà. */
+  function resumeBadge(item) {
+    var match = /S(\d+)E(\d+)/.exec(item.name || '');
+    var parts = [];
+    if (match) parts.push('S' + match[1] + ' E' + match[2]);
+    var entry = Storage.getResumeEntry(item.type + ':' + item.id);
+    if (entry && entry.duration) {
+      var left = Math.max(1, Math.round((entry.duration - entry.position) / 60));
+      parts.push(left >= 60 ? Math.floor(left / 60) + ' h ' + (left % 60) + ' min' : left + ' min');
+    }
+    return parts.join(' · ') || 'Riprendi';
   }
 
   /** Una riga per partita: il canale (il primo che la trasmette) con orario e titolo al posto della guida. */
@@ -1906,6 +1920,17 @@
         }
       }
       if (state.movingKey && handleMovingKey(action)) return true;
+      if (action === 'blue' && state.section === 'favorites' && state.categoryId === 'continue' &&
+          Nav.current && Nav.current.item && Nav.current.item.resumeAt !== undefined) {
+        // BLU in "Continua a guardare": toglie il contenuto dall'elenco.
+        var gone = Nav.current.item;
+        Storage.clearResume(gone.type + ':' + gone.id);
+        UI.toast('Tolto da Continua a guardare');
+        state.categoryId = null;
+        showFavorites('continue');
+        Nav.focusZone('browse-items') || Nav.focusZone('browse-cats');
+        return true;
+      }
       if (action === 'yellow' && startMoving()) return true;
       if (action === 'red' && Nav.current && Nav.current.item) {
         toggleFavorite(Nav.current);

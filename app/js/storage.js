@@ -181,6 +181,25 @@
       write('resume', all);
     },
 
+    /** Voce di ripresa completa ({position, duration, at, item}) o null. */
+    getResumeEntry: function (key) { return read('resume', {})[key] || null; },
+    /** Toglie un contenuto da "Continua a guardare". */
+    clearResume: function (key) {
+      var all = read('resume', {});
+      if (all[key]) { delete all[key]; write('resume', all); }
+    },
+
+    /** Ultimo episodio avviato di ogni serie: {id serie: id episodio}, per proporre il successivo. */
+    getSeriesLast: function (seriesId) { return read('seriesLast', {})[seriesId] || null; },
+    setSeriesLast: function (seriesId, episodeId) {
+      var all = read('seriesLast', {});
+      delete all[seriesId]; // rimette la serie in fondo all'elenco delle chiavi (la più recente)
+      all[seriesId] = String(episodeId);
+      var keys = Object.keys(all);
+      if (keys.length > 100) delete all[keys[0]];
+      write('seriesLast', all);
+    },
+
     /** Film ed episodi lasciati a metà, dal più recente: [{item, position, duration}]. */
     getContinueWatching: function (limit) {
       var all = read('resume', {});

@@ -14,7 +14,11 @@
   var seasonsEl = el.querySelector('.detail-seasons');
   var episodesEl = el.querySelector('.detail-episodes');
 
-  var state = { item: null, info: null, episodes: {}, season: null, token: 0 };
+  var CHUNK = 25; // stagioni più lunghe si dividono in blocchi ("1–25", "26–50"...)
+  var rangesEl = h('div.detail-ranges.scroll');
+  episodesEl.parentNode.insertBefore(rangesEl, episodesEl);
+
+  var state = { item: null, info: null, episodes: {}, season: null, range: 0, token: 0 };
 
   // Sfondo: la locandina su un canvas di 32x18 px allargato a tutto schermo, quindi già sfocato.
   var backdropEl = h('div.detail-backdrop', {}, [h('canvas', { width: '32', height: '18' })]);
@@ -82,6 +86,16 @@
         else App.show('player', { playlist: [playable], index: 0, startAt: 0 });
       }));
     }
+    if (item.type === 'series') {
+      var next = nextEpisode();
+      if (next) {
+        actionsEl.appendChild(button('play-series', next.position
+          ? '▶ Riprendi S' + next.season + ' E' + next.episode.episode_num + ' da ' + UI.formatDuration(next.position)
+          : '▶ Riproduci S' + next.season + ' E' + next.episode.episode_num, function () {
+          playEpisode(next.season, next.index, next.position);
+        }));
+      }
+    }
     var fav = button('fav', favoriteLabel(), function () {
       var added = Storage.toggleFavorite(item);
       fav.textContent = favoriteLabel();
@@ -125,41 +139,120 @@
     else episodesEl.appendChild(h('p.empty', { text: 'Nessun episodio disponibile' }));
   }
 
-  function selectSeason(season) {
+  function selectSeason(season, range) {
     state.season = season;
+    state.range = range || 0;
     Array.prototype.forEach.call(seasonsEl.children, function (s) {
       s.classList.toggle('selected', s.getAttribute('data-key') === 'season-' + season);
     });
+    renderRanges();
     renderEpisodes();
   }
 
-  function renderEpisodes() {
+  /** Blocchi di episodi per le stagioni lunghe: ▲ dagli episodi ci arriva, ◀▶ li cambia. */
+  function renderRanges() {
+    var total = (state.episodes[state.season] || []).length;
+    Nav.forgetZone('detail-ranges');
+    UI.clear(rangesEl);
+    el.classList.toggle('has-ranges', total > CHUNK);
+    if (total <= CHUNK) return;
+    for (var start = 0; start < total; start += CHUNK) {
+      (function (index, from) {
+        var label = (from + 1) + '–' + Math.min(total, from + CHUNK);
+        var rangeEl = h('div.season.range.focusable', {
+          'data-zone': 'detail-ranges', 'data-key': 'range-' + index, text: label
+        });
+        rangeEl.onFocusIn = function () {
+          if (state.range === index) return;
+          state.range = index;
+          markRange();
+          renderEpisodes();
+        };
+        rangeEl.onSelect = function () { Nav.focusZone('detail-episodes'); };
+        rangesEl.appendChild(rangeEl);
+      })(start / CHUNK, start);
+    }
+    markRange();
+  }
+
+  function markRange() {
+    Array.prototype.forEach.call(rangesEl.children, function (r) {
+      r.classList.toggle('selected', r.getAttribute('data-key') === 'range-' + state.range);
+    });
+  }
+
+  function playlistFor(season) {
     var seriesName = state.item.name;
-    var season = state.season;
-    var playlist = (state.episodes[season] || []).map(function (ep) {
+    return (state.episodes[season] || []).map(function (ep) {
+      var info = ep.info || {};
       return {
         type: 'episode', id: String(ep.id), ext: ep.container_extension, icon: state.item.icon,
         name: seriesName + ' – S' + season + 'E' + ep.episode_num + (ep.title ? ' · ' + stripPrefix(ep.title, seriesName) : ''),
-        duration: (ep.info && ep.info.duration_secs) || 0,
+        duration: info.duration_secs || 0,
         label: ep.episode_num + '. ' + stripPrefix(ep.title || 'Episodio ' + ep.episode_num, seriesName),
-        durationText: (ep.info && ep.info.duration) || ''
+        durationText: info.duration || '',
+        thumb: info.movie_image || '',
+        plot: info.plot || ''
       };
     });
+  }
+
+  function playEpisode(season, index, position) {
+    var playlist = playlistFor(season);
+    Storage.setSeriesLast(String(state.item.id), playlist[index].id);
+    var episode = playlist[index];
+    if (Remote.active()) Remote.sendItem(episode);
+    else App.show('player', { playlist: playlist, index: index, startAt: position || 0 });
+  }
+
+  /**
+   * Cosa proporre con il pulsante principale: l'episodio lasciato a metà (il più recente), altrimenti
+   * quello dopo l'ultimo avviato, altrimenti il primo. {season, index, episode, position}
+   */
+  function nextEpisode() {
+    var flat = [];
+    Xtream.sortedSeasonNumbers(state.episodes).forEach(function (season) {
+      (state.episodes[season] || []).forEach(function (ep, index) {
+        flat.push({ season: season, index: index, episode: ep, position: 0 });
+      });
+    });
+    if (!flat.length) return null;
+    var best = null;
+    var bestAt = 0;
+    var lastId = Storage.getSeriesLast(String(state.item.id));
+    var lastPos = -1;
+    flat.forEach(function (entry, i) {
+      var saved = Storage.getResumeEntry(resumeKey('episode', entry.episode.id));
+      if (saved && saved.at > bestAt) { bestAt = saved.at; best = entry; best.position = saved.position; }
+      if (lastId !== null && String(entry.episode.id) === lastId) lastPos = i;
+    });
+    if (best) return best;
+    if (lastPos >= 0) return flat[lastPos + 1] || flat[0];
+    return flat[0];
+  }
+
+  function renderEpisodes() {
+    var season = state.season;
+    var playlist = playlistFor(season);
+    var from = state.range * CHUNK;
+    var to = playlist.length > CHUNK ? from + CHUNK : playlist.length;
     Nav.forgetZone('detail-episodes');
     UI.clear(episodesEl);
     episodesEl.scrollTop = 0;
-    playlist.forEach(function (episode, index) {
+    playlist.slice(from, to).forEach(function (episode, offset) {
+      var index = from + offset;
       var position = Storage.getResume(resumeKey('episode', episode.id));
       var progress = position && episode.duration ? Math.min(100, position / episode.duration * 100) : 0;
       var epEl = h('div.episode.focusable', { 'data-zone': 'detail-episodes', 'data-key': 'episode-' + episode.id }, [
-        h('span.episode-title', { text: episode.label }),
+        episode.thumb ? UI.img(episode.thumb, 'episode-thumb') : null,
+        h('span.episode-text', {}, [
+          h('span.episode-title', { text: episode.label }),
+          episode.plot ? h('span.episode-plot', { text: episode.plot }) : null
+        ]),
         h('span.episode-duration', { text: position ? 'ripresa da ' + UI.formatDuration(position) : episode.durationText }),
         progress ? h('span.episode-progress', { style: 'width:' + progress.toFixed(1) + '%' }) : null
       ]);
-      epEl.onSelect = function () {
-        if (Remote.active()) Remote.sendItem(episode);
-        else App.show('player', { playlist: playlist, index: index, startAt: position });
-      };
+      epEl.onSelect = function () { playEpisode(season, index, position); };
       episodesEl.appendChild(epEl);
     });
   }
@@ -208,7 +301,9 @@
       state.season = null;
       el.classList.toggle('is-series', state.item.type === 'series');
       UI.clear(seasonsEl);
+      UI.clear(rangesEl);
       UI.clear(episodesEl);
+      el.classList.remove('has-ranges');
       renderInfo();
       renderActions();
       Nav.focusFirst();

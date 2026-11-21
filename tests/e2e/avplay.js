@@ -339,6 +339,22 @@ async function main() {
     assert.match(await page.textContent('.player-title'), /S1E2/);
   });
 
+  await step('serie: pulsante Riprendi/Riproduci SxEy e blocchi di episodi', async function () {
+    await press('Escape');
+    await page.waitForSelector('#screen-detail.active .episode');
+    var main = await page.textContent('#screen-detail [data-key="play-series"]');
+    assert.match(main, /Riprendi S1 E2|Riproduci S1 E3|Riproduci S1 E2/, 'proposta dell\'episodio dopo l\'ultimo avviato: ' + main);
+    assert.strictEqual(await page.$$eval('.detail-ranges .range', function (n) { return n.length; }), 0, 'niente blocchi con 8 episodi');
+    await page.evaluate(function () { Nav.focus(document.querySelector('[data-key="season-3"]')); });
+    await page.waitForSelector('#screen-detail.has-ranges .range');
+    assert.strictEqual(await page.$$eval('.detail-ranges .range', function (n) { return n.length; }), 3);
+    assert.strictEqual(await page.$$eval('.episode', function (n) { return n.length; }), 25);
+    await page.evaluate(function () { Nav.focus(document.querySelectorAll('.detail-ranges .range')[2]); });
+    await page.waitForFunction(function () { return document.querySelectorAll('.episode').length === 10; });
+    assert.match(await page.textContent('.episode .episode-plot'), /Episodio 51/);
+    await press('Escape');
+  });
+
   assert.deepStrictEqual(errors, [], 'errori JavaScript nella pagina');
   await browser.close();
   server.close();

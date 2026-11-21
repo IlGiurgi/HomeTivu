@@ -95,9 +95,9 @@ function seriesInfo(id) {
   var entry = series.filter(function (x) { return String(x.series_id) === String(id); })[0];
   var name = entry ? entry.name : 'Serie';
   var episodes = {};
-  [1, 2].forEach(function (season) {
+  [1, 2, 3].forEach(function (season) {
     episodes[season] = [];
-    for (var e = 1; e <= (season === 1 ? 8 : 5); e++) {
+    for (var e = 1; e <= (season === 1 ? 8 : season === 2 ? 5 : 60); e++) {
       episodes[season].push({
         id: String(id * 100 + season * 10 + e), episode_num: e, season: season,
         title: name + ' - S0' + season + 'E0' + e + ' - Episodio ' + e, container_extension: 'mkv',
@@ -106,7 +106,7 @@ function seriesInfo(id) {
     }
   });
   return {
-    seasons: [{ season_number: 1, name: 'Stagione 1' }, { season_number: 2, name: 'Stagione 2' }],
+    seasons: [{ season_number: 1, name: 'Stagione 1' }, { season_number: 2, name: 'Stagione 2' }, { season_number: 3, name: 'Stagione 3' }],
     info: { name: name, cover: entry ? entry.cover : '', plot: 'Una serie avvincente.', genre: 'Crime', releaseDate: '2021-03-01', rating: '8' },
     episodes: episodes
   };
