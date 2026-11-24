@@ -677,8 +677,9 @@
       giveUp('Questo browser non supporta MPEG-TS: prova il formato HLS nelle impostazioni');
       return;
     }
+    // Niente inseguimento forzato della diretta: con buffer spento mandava il video avanti a scatti, con un 'waiting' (rotellina di caricamento) ogni pochi secondi. Un piccolo buffer di sicurezza tiene la riproduzione fluida.
     engine = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: url }, {
-      enableStashBuffer: false, liveBufferLatencyChasing: true
+      enableStashBuffer: true, liveBufferLatencyChasing: false
     });
     engine.on(mpegts.Events.ERROR, function (type, detail, info) {
       if (!current()) return;
